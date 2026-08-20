@@ -1,4 +1,4 @@
-# Compilador JavasCript - Golang
+# Compilador JavaScript - Golang
 
 A ideia inicial do projeto esta em um compilador basico da linguagem Javascript (ECMAScript TC39), para a linguagem Go (Golang)
 
