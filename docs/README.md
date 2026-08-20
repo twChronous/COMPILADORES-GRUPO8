@@ -1,12 +1,10 @@
-# Compilador JavaScript - Golang
+# Compilador JavaScript para Go
 
-A ideia inicial do projeto esta em um compilador basico da linguagem Javascript (ECMAScript TC39), para a linguagem Go (Golang)
+Este projeto consiste no desenvolvimento de um compilador básico que traduz código da linguagem **JavaScript** (baseado no padrão ECMAScript TC39) para a linguagem **Go** (Golang). 
 
-# Language Specification
+Este é um projeto contínuo, desenvolvido ao longo do semestre para a disciplina de Compiladores.
 
-O documento que define o JavaScript é o [ECMAScript Language Specification](./ECMA-262_17th_edition_june_2026.pdf) (conhecido pelo código do padrão, ECMA-262).
+## 📚 Documentação Técnica
 
-
-O documento oficial é chamado de The Go Programming Language Specification.
-Ao contrário do C (que é regido pela ISO) ou do JavaScript (Ecma), o Go não é regido por um órgão externo de padronização. A especificação é mantida pela própria equipe do projeto Go (originada no Google e agora open source).
-[go.dev/ref/spec](go.dev/ref/spec)
+* [Especificação da Linguagem e Escopo](Escopo.md)
+* [Decisões de Arquitetura](Arquitetura.md)
