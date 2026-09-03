@@ -247,7 +247,7 @@ export default class AnalyzerLoader {
       const analyzerInstance = new AnalyzerClass(this.client);
       this.client.analyzers.push(analyzerInstance);
 
-      this.client.LOG(`Analyzer registered: ${analyzerInstance.path}`, this.name);
+      this.client.LOG(`Analyzer registered: ${analyzerInstance.name}`, this.name);
 
       return { file, success: true };
     } catch (error) {
