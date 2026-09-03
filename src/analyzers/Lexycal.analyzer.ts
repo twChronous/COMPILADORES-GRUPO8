@@ -10,7 +10,6 @@ const Palavras_Reservadas = {
   EOF: 'EOF'              // Fim do arquivo (End of File)
 };
 
-
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
