@@ -82,3 +82,27 @@ de forma isolada e substituir uma implementação sem alterar todo o sistema.
 
 Detalhes da gramática, das construções suportadas e das decisões de tradução
 serão especificados nos documentos de escopo e de especificação da linguagem.
+
+
+## Estrutura do projeto
+
+```text
+├── README.md
+├── bun.lock 
+├── docs - Pasta onde está a documentação tecnica do projeto
+│   ├── Arquitetura.md
+│   ├── ECMA-262_17th_edition_june_2026.pdf
+│   ├── Escopo.md
+│   ├── README.md
+│   └── _config.yml
+├── node_modules - Pasta onde se encontram os pacotes necessarios para executar o projeto
+├── package.json - Arquivo padrão de definições de projeto JS
+├── src - Pasta onde o codigo em si é mantido
+│   ├── Compiler.ts - Arquivo principal do compilador
+│   ├── analyzers - Pasta onde se encontram os analizadores do compilador
+│   ├── index.ts - Arquivo de EXECUÇÃO do compilador
+│   ├── loaders - Pasta onde se encontram os loaders, que carregam os analizadores, geradores e etc
+│   ├── models - Pasta onde se encontram classes "modelos"
+│   └── utils - Pasta de utilitarios de codigo, funções repetitivas, tipagens, entre outros
+└── tsconfig.json - Arquivo padrão de configuração do compilador do TypeScript
+```
