@@ -14,7 +14,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * 
    * @method run
    * @public
-   * @description Registra rotas para diferentes operações de autenticação
+   * @description faz a analise semantica
    * @returns {void}
    */
   public run(): boolean {

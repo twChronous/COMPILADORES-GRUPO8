@@ -14,7 +14,7 @@ export default class LexAnalyzer extends AnalyzerModel {
    * 
    * @method run
    * @public
-   * @description Registra rotas para diferentes operações de autenticação
+   * @description Faz a analise lexica
    * @returns {void}
    */
   public run(): boolean {
