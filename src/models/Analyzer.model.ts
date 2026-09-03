@@ -14,13 +14,13 @@ export default class AnalyzerModel {
     public client: ClientInterface;
 
     /** 
-     * Nome identificador da rota
+     * Nome identificador do analizador
      * @type {string}
      */
     public name: string;
 
     /** 
-     * Descrição detalhada da funcionalidade da rota
+     * Descrição detalhada da funcionalidade do analizador
      * @type {string}
      */
     public description: string;
@@ -29,9 +29,9 @@ export default class AnalyzerModel {
      * Construtor da classe RoutesModel
      * 
      * @param {ClientInterface} client - Instância do cliente com recursos do sistema
-     * @param {AnalyzerModelOptions} options - Opções de configuração da rota
-     * @param {string} [options.name="Sem Nome"] - Nome da rota (padrão: "Sem Nome")
-     * @param {string} [options.description="Nenhuma"] - Descrição da rota (padrão: "Nenhuma")
+     * @param {AnalyzerModelOptions} options - Opções de configuração do analizador
+     * @param {string} [options.name="Sem Nome"] - Nome do analizador (padrão: "Sem Nome")
+     * @param {string} [options.description="Nenhuma"] - Descrição do analizador (padrão: "Nenhuma")
      */
     constructor(
         client: ClientInterface, 
@@ -47,16 +47,16 @@ export default class AnalyzerModel {
     }
   
     /**
-     * Método para execução/configuração da rota
+     * Método para execução/configuração do analizador
      * 
      * @description 
      * - Método abstrato que deve ser sobrescrito por classes filhas
-     * - Responsável por definir a lógica específica de cada rota
+     * - Responsável por definir a lógica específica de cada analizador
      * 
      * @returns {void}
      */
-    public run(): void {
+    public run({...args}): void {
         // Método base vazio, deve ser implementado pelas classes derivadas
-        // Cada rota específica irá sobrescrever este método com sua própria lógica
+        // Cada analizador específico irá sobrescrever este método com sua própria lógica
     }
 }
