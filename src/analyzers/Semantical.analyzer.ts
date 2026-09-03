@@ -5,7 +5,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
         name: "Semantico",
-        description: "Analise Léxica do compilador"
+        description: "Analise semantica do compilador"
     })
   }
 
