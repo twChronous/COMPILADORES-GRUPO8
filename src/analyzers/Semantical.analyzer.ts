@@ -1,7 +1,7 @@
 import AnalyzerModel from "../models/Analyzer.model";
 import { ClientInterface } from "../utils/types";
 
-export default class LexAnalyzer extends AnalyzerModel {
+export default class SemanticalAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
         name: "Semantico",
