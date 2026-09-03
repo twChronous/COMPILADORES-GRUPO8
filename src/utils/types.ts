@@ -70,3 +70,8 @@ export interface LoaderInitConfig {
      */
     parallel?: boolean;
 }
+
+//Interface de entrada em construção
+export interface argsProps {
+  input: String
+}
