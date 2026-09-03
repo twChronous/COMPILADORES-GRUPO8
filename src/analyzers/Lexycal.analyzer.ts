@@ -10,6 +10,10 @@ const Palavras_Reservadas = {
   EOF: 'EOF'              // Fim do arquivo (End of File)
 };
 
+interface analisarLexicoOut {
+  tipo: string,
+  valor: string,
+}
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
@@ -31,7 +35,15 @@ export default class LexAnalyzer extends AnalyzerModel {
     return true;
   }
 
-  private analisarLexico(entrada:String) {
+    /**
+   * Analise Léxica do compilador
+   * 
+   * @method analisarLexico
+   * @public
+   * @description Faz a analise lexica em si
+   * @returns {Array<analisarLexicoOut>}
+   */
+  private analisarLexico(entrada:String): Array<analisarLexicoOut> {
     let atual = 0;
     const tokens = [];
 
