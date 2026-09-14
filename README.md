@@ -36,6 +36,7 @@ para executar a suite de testes
   bun test
 ```
 
+Os testes unitários usam `bun:test` e ficam ao lado do código-fonte com sufixo `.spec.ts` (ex.: `src/analyzers/Lexycal.analyzer.spec.ts`). Cada fase do compilador deve testar sua lógica pura (ex.: `tokenize`), não o pipeline completo.
 
 ## 🚀 Como Executar (Conteiner)
 
