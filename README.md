@@ -21,17 +21,46 @@ O progresso do compilador seguirá as etapas clássicas de compilação:
 - [ ] **Otimizador de Código:** Melhorias de performance na IR.
 - [ ] **Geração de Código Final:** Tradução final para arquivos `.go`.
 
-## 🚀 Como Executar (Em breve)
-
-> **Nota:** Estas instruções serão atualizadas assim que a primeira versão do Analisador Léxico for finalizada.
+## 🚀 Como Executar (Localmente)
 
 **Pré-requisitos:**
-* Go (versão X.X ou superior)
+* Node JS (versão 24.20.0 ou superior)
+* BunJS (versão 1.4.0 ou superior)
 
+para executar normalmente
 ```bash
-
+  bun start
+```
+para executar a suite de testes
+```bash
+  bun test
 ```
 
+
+## 🚀 Como Executar (Conteiner)
+
+**Pré-requisitos:**
+* Docker (versão 29.7.2, ou superior)
+
+```bash
+  docker build -t Compilador .
+```
+
+para executar em modo hot reload 
+```bash
+  docker run --rm -v $(pwd):/app Compilador run --hot index.ts
+```
+
+para executar a suite de testes 
+```bash
+  docker run --rm Compilador test
+```
+
+para executar passando argumentos
+```bash
+  # Isso equivale a rodar `bun start --input 'aaaaaa'`
+  docker run --rm Compilador start --input 'aaaaaa'
+```
 ## 🤝 Contribuindo 
 
 1.  Execute o comando ``git pull``.
