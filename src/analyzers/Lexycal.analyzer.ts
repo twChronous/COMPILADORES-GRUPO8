@@ -28,10 +28,11 @@ export default class LexAnalyzer extends AnalyzerModel {
    * @method run
    * @public
    * @description Faz a analise lexica
-   * @returns {void}
+   * @returns {boolean}
    */
   public run(args: argsProps): boolean {
-    this.tokenize(String(args.input));
+    const tokens = this.tokenize(String(args.input));
+    this.client.LOG(JSON.stringify(tokens));
     return true;
   }
 

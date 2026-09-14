@@ -44,23 +44,23 @@ Os testes unitários usam `bun:test` e ficam ao lado do código-fonte com sufixo
 * Docker (versão 29.7.2, ou superior)
 
 ```bash
-  docker build -t Compilador .
+  docker build -t compilador .
 ```
 
 para executar em modo hot reload 
 ```bash
-  docker run --rm -v $(pwd):/app Compilador run --hot index.ts
+  docker run --rm -v $(pwd):/app compilador run --hot index.ts
 ```
 
 para executar a suite de testes 
 ```bash
-  docker run --rm Compilador test
+  docker run --rm compilador test
 ```
 
 para executar passando argumentos
 ```bash
   # Isso equivale a rodar `bun start --input 'aaaaaa'`
-  docker run --rm Compilador start --input 'aaaaaa'
+  docker run --rm compilador start --input 'aaaaaa'
 ```
 ## 🤝 Contribuindo 
 
