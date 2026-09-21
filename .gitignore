@@ -34,6 +34,7 @@ web_modules/
 .yarn/install-state.gz
 .pnp.*
 
+
 # Build and package outputs
 *.tsbuildinfo
 *.tgz
