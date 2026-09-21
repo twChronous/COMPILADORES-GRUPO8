@@ -11,7 +11,7 @@ export interface argsProps {
 
 (async () => {
   const args: argsProps = {
-    input: "let x = 10 + 20 + A " // caso adicione o caracter desconhecido "/", por exemplo ele acusa falha
+    input: "let x = 10 + 20 + A          +" // caso adicione o caracter desconhecido "/", por exemplo ele acusa falha
   }
   await comp.initializeLoaders()
   //console.log(comp.analyzers) // Pelo LOG vemos que os analisadores foram devidamente carregados 
