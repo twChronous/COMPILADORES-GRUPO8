@@ -12,7 +12,7 @@ const Palavras_Reservadas = {
 
 interface analisarLexicoOut {
   tipo: string,
-  valor: string | null,
+  valor: string,
 }
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
