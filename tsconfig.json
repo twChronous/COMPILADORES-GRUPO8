@@ -4,9 +4,8 @@
       "module": "ESNext",
       "esModuleInterop": true,
       "allowSyntheticDefaultImports": true,
-      "moduleResolution": "bundler",
+      "moduleResolution": "node",
       "outDir": "./dist",
-      "types": ["bun", "node"],
       "strict": true
     },
     "include": ["src/**/*"],

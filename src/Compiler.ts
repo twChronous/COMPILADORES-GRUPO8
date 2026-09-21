@@ -1,5 +1,5 @@
 import Loaders from "./loaders";
-import AnalyzerLoader from "./loaders/Analyzers.loader";
+import AnalyzerLoader from "./loaders/Analyzers.loader.ts";
 import { ClientInterface, LoaderInitConfig, LoaderResult } from "./utils/types";
 
 /**
