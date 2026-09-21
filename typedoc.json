@@ -1,0 +1,31 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs/compiler",
+  "name": "Documentação do Código",
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "node_modules/**"
+  ],
+  "lang": "pt-BR",
+  "locales": {
+    "pt-BR": {
+      "theme_properties": "Propriedades",
+      "theme_methods": "Métodos",
+      "theme_classes": "Classes",
+      "theme_interfaces": "Interfaces",
+      "theme_functions": "Funções",
+      "theme_types": "Tipos",
+      "theme_hierarchy": "Hierarquia",
+      "theme_implements": "Implementa",
+      "theme_defined_in": "Definido em",
+      "theme_returns": "Retorna",
+      "theme_parameters": "Parâmetros"
+    }
+  },
+  "blockTags": ["@description", "@method", "@async", "@implements", "@constructor"],
+  "excludePrivate": false,
+  "excludeProtected": false,
+  "excludeInternal": false
+}
