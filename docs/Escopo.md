@@ -18,34 +18,27 @@ Este documento define o subconjunto estrito da linguagem JavaScript (ECMAScript)
 
 ## 1. Tipos de Dados
 
-| JavaScript (Origem) | Go (Destino) |
-| --- | --- |
-| `Number` | `float64` |
-| `String` | `string` |
-| `Boolean` | `bool` |
+Valores identificados de forma absoluta no código:
 
-## 2. Declaração e Atribuição de Variáveis
+* **Number (`NUMERO`):** Reconhece números inteiros e decimais de ponto flutuante (ex: `10`, `3.14`). Expressão de captura: `/[0-9.]/`.
+* **String (`STRING`):** Sequências de texto delimitadas por aspas simples ou duplas (ex: `"Olá Mundo"`, `'teste'`).
+* **Boolean (`BOOLEAN`):** Reconhecimento estrito das palavras reservadas `true` e `false`.
 
-- **Suportado:** `let` e `const` .
-- **Não Suportado:** `var`
+## 2. Palavras-Chave
 
-**Comparativo de Tradução:**
+Palavras reservadas mapeadas e categorizadas com seus respectivos subtipos:
 
-```jsx
-````
-// Entrada: JavaScript
-let contador = 10;
-const saudacao = "Olá Mundo";
-```
+* **Declaração de Variáveis:** `let`, `const`, `var`
+* **Controle de Fluxo e Repetição:** `if`, `else`, `while`, `for`
+* **Funções e Retorno:** `function`, `return`
 
-```go
-````
-//Saída: Go
-var contador float64 = 10
-const saudacao = "Olá Mundo"
-```
+## 3. Identificadores 
 
-## 3. Operadores
+Nomes atribuídos a variáveis, funções ou comandos nativos (como `console` e `log`).
+
+* **Regra de Formação:** Devem iniciar com letra (a-z, A-Z) ou sublinhado (`_`), seguidos por letras, números ou sublinhados.
+
+## 4. Operadores
 
 | **Categoria** | **Operadores** |
 | --- | --- |
@@ -54,61 +47,16 @@ const saudacao = "Olá Mundo"
 | **Relacionais** | `>`, `<`, `>=`, `<=`, `==`, `!=` |
 | **Lógicos** | `&&`, ` |
 
-## 4. Controle de Fluxo
+## 5. Delimitadores e Pontuação 
 
-O Go simplifica loops usando apenas a palavra reservada `for` .
+Caracteres de estruturação de blocos, parâmetros e chamadas:
 
-**Condicionais:** `if`, `else` , `else if` .
+* **Suportados:** `{`, `}`, `(`, `)`, `,`, `;`, `.` 
+* *(Nota: O ponto `.` é suportado nativamente para permitir a leitura de chamadas de métodos, essencial para o comando de I/O `console.log`).*
 
-**Laços de Repetição:**
+## 6. Estrutura e Fim de Arquivo
 
-```jsx
-````
-//Entrada JavaScript
-while (condicao) { ... }
-for (let i = 0; i < 10; i++) { ... }
-```
+* **Caracteres Ignorados (Whitespace):** Espaços em branco, quebras de linha (`\n`), retorno de carro (`\r`) e tabulações (`\t`) são consumidos e descartados sem gerar tokens.
+* **Término (`EOF`):** Ao final da leitura da cadeia de caracteres, o analisador injeta automaticamente o token `EOF` (End of File).
 
-```go
-````
-//Saída: Go
-for condicao { ... }
-for i:= 0; float64(i) < 10; i++ { ... }
-```
-
-## 5. Funções
-
-Apenas declarações de funções clássicas nomeadas estarão no escopo.
-
-- Declaração clássica: `function nome(param) { return ... }`.
-- **Tradução:** Mapeado para `func nome(param tipo) tipo { ... }`.
-
-```jsx
-```` 
-//Entrada: JavaScript
-function calcularArea(raio) {
-	return 3.14 * raio * raio;
-}
-```
-
-```go
-````
-//Saída: Go
-func calcularArea(raio float64) float64 {
-	return 3.14 * raio * raio
-}
-```
-
-## 6. Entrada e Saída (I/O)
-
-- **JS `console.log(...)`** ➔ Traduzido para **Go `fmt.Println(...)`** com a importação do pacote `fmt`.
-
-## Fora do Escopo
-
-Para garantir a entrega do projeto com qualidade técnica no prazo acadêmico estipulado, as seguintes *features* **NÃO** serão suportadas nesta versão do compilador:
-
-1. **Orientação a Objetos:** Classes, `Prototypes`, herança, `this` e operador `new`.
-2. **Assincronicidade:** `async`, `await`, `Promises`, APIs de Timer (`setTimeout`).
-3. **Tratamento de Exceções:** Blocos `try`, `catch`, `finally` e `throw`.
-4. **Tipagem Dinâmica Fraca:** Mudança de tipos em tempo de execução (tratado como erro semântico).
-5. **Estruturas Complexas:** Arrays de tipos mistos, Objetos literais dinâmicos e *Arrow Functions*.
+---
