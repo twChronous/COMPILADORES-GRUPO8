@@ -7,5 +7,9 @@ Este é um projeto contínuo, desenvolvido ao longo do semestre para a disciplin
 ## 📚 Documentação Técnica
 
 * [Especificação da Linguagem e Escopo](Escopo.md)
+<<<<<<< HEAD
 * [Decisões de Arquitetura](Arquitetura.md)
 * [Documentação de Código](compiler/)
+=======
+* [Decisões de Arquitetura](Arquitetura.md)
+>>>>>>> main

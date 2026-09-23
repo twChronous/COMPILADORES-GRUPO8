@@ -8,9 +8,12 @@
     "src": "source"
   },
   "scripts": {
+<<<<<<< HEAD
     "docs": "typedoc",
+=======
+>>>>>>> main
     "start": "bun run src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "bun test"
   },
   "repository": {
     "type": "git",
@@ -25,8 +28,7 @@
   },
   "homepage": "https://github.com/twChronous/COMPILADORES-GRUPO8#readme",
   "dependencies": {
-    "@types/bun": "^1.4.2",
-    "@types/node": "^26.4.0",
-    "typedoc": "^0.28.20"
+    "@types/bun": "^1.4.0",
+    "@types/node": "^26.4.0"
   }
 }
