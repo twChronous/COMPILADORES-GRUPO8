@@ -11,8 +11,8 @@ const Palavras_Reservadas = {
 };
 
 interface analisarLexicoOut {
-  tipo: string,
-  valor: string,
+  tipo: string;
+  valor: string | null;
 }
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
@@ -28,24 +28,25 @@ export default class LexAnalyzer extends AnalyzerModel {
    * @method run
    * @public
    * @description Faz a analise lexica
-   * @returns {void}
+   * @returns {boolean}
    */
-  public run(args:argsProps): boolean {
-    this.analisarLexico(args.input)
+  public run(args: argsProps): boolean {
+    const tokens = this.tokenize(String(args.input));
+    this.client.LOG(JSON.stringify(tokens));
     return true;
   }
 
-    /**
+  /**
    * Analise Léxica do compilador
-   * 
-   * @method analisarLexico
+   *
+   * @method tokenize
    * @public
    * @description Faz a analise lexica em si
    * @returns {Array<analisarLexicoOut>}
    */
-  private analisarLexico(entrada:String): Array<analisarLexicoOut> {
+  public tokenize(entrada: string): Array<analisarLexicoOut> {
     let atual = 0;
-    const tokens = [];
+    const tokens: analisarLexicoOut[] = [];
 
     while (atual < entrada.length) {
       let caractere = entrada[atual];
@@ -97,7 +98,6 @@ export default class LexAnalyzer extends AnalyzerModel {
 
     // Adicionar token indicando o fim do código
     tokens.push({ tipo: Palavras_Reservadas.EOF, valor: null });
-    console.log(tokens); //LOG PARA DEIXAR VISUAL
     return tokens;
   }
 }
