@@ -14,4 +14,49 @@ Ao contrário do C (que é regido pela ISO) ou do JavaScript (Ecma), o Go não �
 
 ## Escopo
 
-> A definir
+Este documento define o subconjunto estrito da linguagem JavaScript (ECMAScript) que será suportado pelo compilador para geração de código Go.
+
+## 1. Tipos de Dados
+
+Valores identificados de forma absoluta no código:
+
+* **Number (`NUMERO`):** Reconhece números inteiros e decimais de ponto flutuante (ex: `10`, `3.14`). Expressão de captura: `/[0-9.]/`.
+* **String (`STRING`):** Sequências de texto delimitadas por aspas simples ou duplas (ex: `"Olá Mundo"`, `'teste'`).
+* **Boolean (`BOOLEAN`):** Reconhecimento estrito das palavras reservadas `true` e `false`.
+
+## 2. Palavras-Chave
+
+Palavras reservadas mapeadas e categorizadas com seus respectivos subtipos:
+
+* **Declaração de Variáveis:** `let`, `const`, `var`
+* **Controle de Fluxo e Repetição:** `if`, `else`, `while`, `for`
+* **Funções e Retorno:** `function`, `return`
+
+## 3. Identificadores 
+
+Nomes atribuídos a variáveis, funções ou comandos nativos (como `console` e `log`).
+
+* **Regra de Formação:** Devem iniciar com letra (a-z, A-Z) ou sublinhado (`_`), seguidos por letras, números ou sublinhados.
+
+## 4. Operadores
+
+| **Categoria** | **Operadores** |
+| --- | --- |
+| **Aritméticos** | `+`, `-`, `*`, `/`, `%` |
+| **Atribuição** | `=`, `+=`, `-=` |
+| **Relacionais** | `>`, `<`, `>=`, `<=`, `==`, `!=` |
+| **Lógicos** | `&&`, ` |
+
+## 5. Delimitadores e Pontuação 
+
+Caracteres de estruturação de blocos, parâmetros e chamadas:
+
+* **Suportados:** `{`, `}`, `(`, `)`, `,`, `;`, `.` 
+* *(Nota: O ponto `.` é suportado nativamente para permitir a leitura de chamadas de métodos, essencial para o comando de I/O `console.log`).*
+
+## 6. Estrutura e Fim de Arquivo
+
+* **Caracteres Ignorados (Whitespace):** Espaços em branco, quebras de linha (`\n`), retorno de carro (`\r`) e tabulações (`\t`) são consumidos e descartados sem gerar tokens.
+* **Término (`EOF`):** Ao final da leitura da cadeia de caracteres, o analisador injeta automaticamente o token `EOF` (End of File).
+
+---
