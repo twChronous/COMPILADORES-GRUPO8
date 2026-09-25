@@ -142,3 +142,5 @@ tools/gotestsum.exe.hash
 !tsc/testdata/submoduleTriaged.txt
 
 /docs/compiler
+
+/wiki

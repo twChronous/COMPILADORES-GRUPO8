@@ -1,0 +1,26 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  test:
+    if: github.event.action != 'labeled' || github.event.label.name == 'testes-unitarios'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Instalar dependências
+        run: bun install
+
+      - name: Executar testes
+        run: bun test
