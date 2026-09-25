@@ -8,3 +8,4 @@ Este é um projeto contínuo, desenvolvido ao longo do semestre para a disciplin
 
 * [Especificação da Linguagem e Escopo](Escopo.md)
 * [Decisões de Arquitetura](Arquitetura.md)
+* [Documentação de Código](compiler/)
