@@ -15,14 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     
     steps:
-      - name: Baixar o código do repositório
+      - name: Baixar o código
         uses: actions/checkout@v4
 
       - name: Instalar Bun
@@ -33,16 +33,23 @@ jobs:
       - name: Instalar dependências
         run: bun install
 
-      - name: Gerar documentação TypeDoc
+      - name: Gerar documentação TypeDoc (Gera dentro de /docs)
         run: bun run docs 
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Fazer upload dos artefatos
+      - name: Construir site padrão do Pages
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Fazer upload dos artefatos (Site Finalizado)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs'
+          # Agora fazemos upload da pasta _site gerada pelo Jekyll, não da docs crua
+          path: './_site'
 
       - name: Deploy no GitHub Pages
         id: deployment
