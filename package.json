@@ -8,10 +8,7 @@
     "src": "source"
   },
   "scripts": {
-<<<<<<< HEAD
     "docs": "typedoc",
-=======
->>>>>>> main
     "start": "bun run src/index.ts",
     "test": "bun test"
   },
