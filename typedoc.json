@@ -24,7 +24,7 @@
       "theme_parameters": "Parâmetros"
     }
   },
-  "blockTags": ["@description", "@method", "@async", "@implements", "@constructor"],
+  "blockTags": ["@description", "@method", "@async", "@implements", "@constructor", "@param", "@returns", "@throws", "@type", "@default"],
   "excludePrivate": false,
   "excludeProtected": false,
   "excludeInternal": false
