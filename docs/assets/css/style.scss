@@ -1,0 +1,165 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+:root {
+  --background: #0d1117;
+  --background-soft: #161b22;
+  --border: #30363d;
+
+  --text: #e6edf3;
+  --text-secondary: #8b949e;
+
+  --blue: #58a6ff;
+  --purple: #a371f7;
+}
+
+/* Página */
+
+body {
+  background: var(--background);
+  color: var(--text);
+}
+
+/* Cabeçalho */
+
+.page-header {
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(88, 166, 255, 0.25),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(163, 113, 247, 0.20),
+      transparent 35%
+    ),
+    linear-gradient(
+      135deg,
+      #0d1117,
+      #111827
+    );
+
+  border-bottom: 1px solid var(--border);
+  padding: 5rem 1.5rem 4rem;
+}
+
+.project-name {
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+}
+
+.project-tagline {
+  color: #b6c2cf;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Conteúdo */
+
+.main-content {
+  max-width: 1050px;
+  color: #c9d1d9;
+  line-height: 1.75;
+  padding-top: 3rem;
+}
+
+.main-content h1,
+.main-content h2,
+.main-content h3 {
+  color: #ffffff;
+}
+
+.main-content h2 {
+  margin-top: 3rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Links */
+
+.main-content a {
+  color: var(--blue);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.main-content a:hover {
+  color: #79c0ff;
+  text-decoration: underline;
+}
+
+/* Destaques */
+
+.main-content blockquote {
+  background: rgba(88, 166, 255, 0.07);
+  border-left: 4px solid var(--blue);
+  padding: 1rem 1.2rem;
+  border-radius: 0 8px 8px 0;
+  color: #c9d1d9;
+}
+
+/* Código */
+
+.main-content code {
+  background: #161b22;
+  color: #79c0ff;
+  border-radius: 5px;
+}
+
+.main-content pre {
+  background: #010409;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.4rem;
+}
+
+/* Tabelas */
+
+.main-content table {
+  display: table;
+  width: 100%;
+  background: var(--background-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.main-content th,
+.main-content td {
+  border-color: var(--border);
+  padding: 1rem;
+}
+
+/* Rodapé */
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+/* Responsividade */
+
+@media screen and (max-width: 768px) {
+
+  .page-header {
+    padding: 3.5rem 1rem;
+  }
+
+  .project-name {
+    font-size: 2.2rem;
+  }
+
+  .main-content {
+    padding: 2rem 1.2rem;
+  }
+
+  .main-content table {
+    display: block;
+    overflow-x: auto;
+  }
+}
