@@ -81,7 +81,11 @@ export interface argsProps {
  * Tokens gerados pela analise léxica
  */
 export interface lexicTokens {
-  tipo: string,
+  tipo: TokensType,
   valor: string,
   subtipo?: string;
 }
+/**
+ * Possiveis tipos de tokens gerados pela analise léxica
+ */
+export type TokensType = "KEYWORD" | "IDENTIFICADOR" | "NUMERO" | "OPERADOR" | "EOF" | "BOOLEAN" | "STRING" | "DELIMITADOR"

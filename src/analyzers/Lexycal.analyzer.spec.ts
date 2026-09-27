@@ -3,6 +3,7 @@ import LexAnalyzer from "./Lexycal.analyzer";
 import type { ClientInterface } from "../utils/types";
 
 const mockClient: ClientInterface = {
+  tokens: [],
   analyzers: [],
   LOG() {},
   LOG_ERR() {},

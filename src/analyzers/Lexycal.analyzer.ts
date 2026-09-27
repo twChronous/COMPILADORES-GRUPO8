@@ -1,5 +1,5 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, argsProps, lexicTokens } from "../utils/types";
+import { ClientInterface, TokensType, argsProps, lexicTokens } from "../utils/types";
 import { PALAVRAS_CHAVE, Palavras_Reservadas } from "../utils/wordlist";
 
 export default class LexAnalyzer extends AnalyzerModel {
@@ -47,7 +47,7 @@ export default class LexAnalyzer extends AnalyzerModel {
 
       // 2. Reconhecer Delimitadores de Escopo e Pontuação
       if (/[{}();,.]/.test(caractere)) {
-        tokens.push({ tipo: Palavras_Reservadas.DELIMITADOR, valor: caractere });
+        tokens.push({ tipo: Palavras_Reservadas.DELIMITADOR as TokensType, valor: caractere });
         atual++;
         continue;
       }
@@ -63,7 +63,7 @@ export default class LexAnalyzer extends AnalyzerModel {
           atual++;
         }
         atual++; 
-        tokens.push({ tipo: Palavras_Reservadas.STRING, valor });
+        tokens.push({ tipo: Palavras_Reservadas.STRING as TokensType, valor });
         continue;
       }
 
@@ -75,7 +75,7 @@ export default class LexAnalyzer extends AnalyzerModel {
           valor += entrada[atual];
           atual++;
         }
-        tokens.push({ tipo: Palavras_Reservadas.NUMERO, valor });
+        tokens.push({ tipo: Palavras_Reservadas.NUMERO as TokensType, valor });
         continue;
       }
 
@@ -89,12 +89,12 @@ export default class LexAnalyzer extends AnalyzerModel {
 
       if (PALAVRAS_CHAVE[valor]) {
         if (valor === 'true' || valor === 'false') {
-            tokens.push({ tipo: Palavras_Reservadas.BOOLEAN, valor });
+            tokens.push({ tipo: Palavras_Reservadas.BOOLEAN as TokensType, valor });
         } else {
-            tokens.push({ tipo: Palavras_Reservadas.KEYWORD, valor, subtipo: PALAVRAS_CHAVE[valor] });
+            tokens.push({ tipo: Palavras_Reservadas.KEYWORD as TokensType, valor, subtipo: PALAVRAS_CHAVE[valor] });
         }
       } else {
-        tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR, valor });
+        tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR as TokensType, valor });
       }
 
         continue;
@@ -110,7 +110,7 @@ export default class LexAnalyzer extends AnalyzerModel {
         
         if (valor === '===') valor = '=='; 
         
-        tokens.push({ tipo: Palavras_Reservadas.OPERADOR, valor });
+        tokens.push({ tipo: Palavras_Reservadas.OPERADOR as TokensType, valor });
         continue;
       }
 
@@ -119,8 +119,7 @@ export default class LexAnalyzer extends AnalyzerModel {
     }
 
     // Adicionar token indicando o fim do código
-    tokens.push({ tipo: Palavras_Reservadas.EOF, valor: 'EOF' });
-    console.log(tokens); //LOG PARA DEIXAR VISUAL
+    tokens.push({ tipo: Palavras_Reservadas.EOF as TokensType, valor: 'EOF' });
     return tokens;
   }
 }
