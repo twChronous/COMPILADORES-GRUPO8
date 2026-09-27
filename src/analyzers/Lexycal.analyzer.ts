@@ -1,41 +1,12 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, argsProps } from "../utils/types";
+import { ClientInterface, argsProps, lexicTokens } from "../utils/types";
+import { PALAVRAS_CHAVE, Palavras_Reservadas } from "../utils/wordlist";
 
-const Palavras_Reservadas = {
-  NUMERO: 'NUMERO',
-  STRING: 'STRING',
-  BOOLEAN: 'BOOLEAN',
-  IDENTIFICADOR: 'IDENTIFICADOR',
-  KEYWORD: 'KEYWORD',
-  OPERADOR: 'OPERADOR', // aritméticos, atribuição, relacionais e lógicos
-  DELIMITADOR: 'DELIMITADOR', // delimitadores de escopo []
-  EOF: 'EOF'              // Fim do arquivo (End of File)
-};
-
-const PALAVRAS_CHAVE: Record<string, string> = {
-  'let': 'LET',      
-  'const': 'CONST',          
-  'var': 'VAR', 
-  'function': 'FUNCTION',
-  'if': 'IF',
-  'else': 'ELSE',
-  'while': 'WHILE',
-  'for': 'FOR',
-  'return': 'RETURN',
-  'true': 'TRUE',
-  'false': 'FALSE'
-};
-
-interface analisarLexicoOut {
-  tipo: string,
-  valor: string,
-  subtipo?: string;
-}
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
         name: "Lexico",
-        description: "Analise Léxica do compilador"
+        description: "Analise Léxica do compilador, devolve faz a tokenização da entrada"
     })
   }
 
@@ -49,7 +20,7 @@ export default class LexAnalyzer extends AnalyzerModel {
    */
   public run(args: argsProps): boolean {
     const tokens = this.tokenize(String(args.input));
-    this.client.LOG(JSON.stringify(tokens));
+    this.client.tokens = tokens;
     return true;
   }
 
@@ -59,11 +30,11 @@ export default class LexAnalyzer extends AnalyzerModel {
    * @method tokenize
    * @public
    * @description Faz a analise lexica em si
-   * @returns {Array<analisarLexicoOut>}
+   * @returns {Array<lexicTokens>}
    */
-  public tokenize(entrada: string): Array<analisarLexicoOut> {
+  public tokenize(entrada: string): Array<lexicTokens> {
     let atual = 0;
-    const tokens: analisarLexicoOut[] = [];
+    const tokens: lexicTokens[] = [];
 
     while (atual < entrada.length) {
       let caractere = entrada[atual];

@@ -16,5 +16,6 @@ export interface argsProps {
   await comp.initializeLoaders()
   //console.log(comp.analyzers) // Pelo LOG vemos que os analisadores foram devidamente carregados 
   const lex = comp.analyzers.find(element => element.name == "Lexico") // Busca pelo analizador lexico
-  console.log(lex.run(args)) // executa função "run" definida em "/src/analyzers/Lexycal.analyzer.ts"
+  lex.run(args) // executa função "run" definida em "/src/analyzers/Lexycal.analyzer.ts"
+  console.log(comp.tokens) // print dos tokens
 })();

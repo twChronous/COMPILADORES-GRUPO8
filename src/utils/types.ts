@@ -3,6 +3,7 @@
  * Fornece acesso a recursos e utilitários do sistema
  */
 export interface ClientInterface {
+    tokens: lexicTokens[];
     analyzers: AnalyzerModelOptions[];
     /**
      * Método para log de informações gerais
@@ -74,4 +75,13 @@ export interface LoaderInitConfig {
 //Interface de entrada em construção
 export interface argsProps {
   input: String
+}
+
+/**
+ * Tokens gerados pela analise léxica
+ */
+export interface lexicTokens {
+  tipo: string,
+  valor: string,
+  subtipo?: string;
 }
