@@ -11,11 +11,19 @@ export interface argsProps {
 
 (async () => {
   const args: argsProps = {
-    input: "let x = 10 + 20 + A " // caso adicione o caracter desconhecido "/", por exemplo ele acusa falha
+    input: `
+    let x = 10 + 20 + A; 
+    IF (x > 10) {
+      x + 1
+    }
+    x + 2;
+    ` // caso adicione o caracter desconhecido "/", por exemplo ele acusa falha
   }
   await comp.initializeLoaders()
   //console.log(comp.analyzers) // Pelo LOG vemos que os analisadores foram devidamente carregados 
   const lex = comp.analyzers.find(element => element.name == "Lexico") // Busca pelo analizador lexico
   lex.run(args) // executa função "run" definida em "/src/analyzers/Lexycal.analyzer.ts"
-  console.log(comp.tokens) // print dos tokens
+  //console.log(comp.tokens)
+  const Sint = comp.analyzers.find(element => element.name == "Sintatico")
+  Sint.run()
 })();

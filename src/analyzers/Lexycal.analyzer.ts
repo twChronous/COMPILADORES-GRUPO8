@@ -87,18 +87,20 @@ export default class LexAnalyzer extends AnalyzerModel {
           atual++;
         }
 
-      if (PALAVRAS_CHAVE[valor]) {
-        if (valor === 'true' || valor === 'false') {
-            tokens.push({ tipo: Palavras_Reservadas.BOOLEAN as TokensType, valor });
-        } else {
-            tokens.push({ tipo: Palavras_Reservadas.KEYWORD as TokensType, valor, subtipo: PALAVRAS_CHAVE[valor] });
-        }
-      } else {
-        tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR as TokensType, valor });
-      }
-
-        continue;
-      }
+          const valorNormalizado = valor.toLowerCase();
+            if (PALAVRAS_CHAVE[valorNormalizado]) {
+              if (valorNormalizado === 'true' || valorNormalizado === 'false') {
+                tokens.push({ tipo: Palavras_Reservadas.BOOLEAN as TokensType, valor: valorNormalizado });
+              } else {
+                // Salva a KEYWORD (ex: 'LET', 'IF')
+                tokens.push({ tipo: Palavras_Reservadas.KEYWORD as TokensType, valor: PALAVRAS_CHAVE[valorNormalizado] });
+              }
+            } else {
+              // Se for uma variável, mantemos o Case original (ex: 'meuValor' não vira 'meuvalor')
+              tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR as TokensType, valor });
+            }
+            continue;
+          }
 
      // 6. Reconhecer Operadores amplos 
       if (/[+\-*/%=<>!&|]/.test(caractere)) {
