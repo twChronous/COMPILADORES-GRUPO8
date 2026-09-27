@@ -1,22 +1,24 @@
 <div align="center">
 
-<img
-  src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg"
-  width="75"
-  alt="JavaScript"
-/>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-
-<h3>➜ ⚙️ ➜</h3>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-
-<img
-  src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg"
-  width="90"
-  alt="Go"
-/>
+<p>
+  <img
+    src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg"
+    width="75"
+    height="75"
+    alt="JavaScript"
+    valign="middle"
+  />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <span style="font-size: 1.5em; vertical-align: middle;">➜ ⚙️ ➜</span>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img
+    src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg"
+    width="90"
+    height="90"
+    alt="Go"
+    valign="middle"
+  />
+</p>
 
 <br>
 
