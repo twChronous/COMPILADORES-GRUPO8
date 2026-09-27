@@ -8,7 +8,7 @@
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
-### ➜ ⚙️ ➜
+<h3>➜ ⚙️ ➜</h3>
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 
@@ -20,15 +20,24 @@
 
 <br>
 
-## JavaScript → Go
+<h2>JavaScript → Go</h2>
 
-**Um compilador desenvolvido para explorar, na prática, os fundamentos da construção de linguagens.**
+<p><strong>Um compilador desenvolvido para explorar, na prática, os fundamentos da construção de linguagens.</strong></p>
 
 <br>
 
-![JavaScript](https://img.shields.io/badge/Source-JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
-![Go](https://img.shields.io/badge/Target-Go-00ADD8?style=flat-square&logo=go&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Em%20Desenvolvimento-238636?style=flat-square)
+<img
+  src="https://img.shields.io/badge/Source-JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black"
+  alt="JavaScript"
+/>
+<img
+  src="https://img.shields.io/badge/Target-Go-00ADD8?style=flat-square&logo=go&logoColor=white"
+  alt="Go"
+/>
+<img
+  src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-238636?style=flat-square"
+  alt="Status"
+/>
 
 </div>
 
@@ -46,11 +55,10 @@ O projeto é desenvolvido continuamente ao longo do semestre para a disciplina d
 
 ## 📚 Documentação Técnica
 
-* [Especificação da Linguagem e Escopo](Escopo.md)
-* [Decisões de Arquitetura](Arquitetura.md)
-* [Estrutura de Testes](Testes.md)
-* [Documentação de Código](compiler/)
-
+- [Especificação da Linguagem e Escopo](Escopo.md)
+- [Decisões de Arquitetura](Arquitetura.md)
+- [Estrutura de Testes](Testes.md)
+- [Documentação de Código](compiler/)
 
 ---
 
@@ -66,3 +74,4 @@ Compilador
     │
     ▼
 Go
+```
