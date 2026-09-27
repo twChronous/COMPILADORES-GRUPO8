@@ -35,22 +35,22 @@ describe("LexAnalyzer", () => {
     );
   });
 
-  test("tokenize: reconhece todas as palavras-chave com o subtipo correto", () => {
+  test("tokenize: reconhece todas as palavras-chave corretamente", () => {
     const analyzer = new LexAnalyzer(mockClient);
     const tokens = analyzer.tokenize(
       "let const var function if else while for return"
     );
 
     expect(tokens).toEqual([
-      { tipo: "KEYWORD", valor: "let", subtipo: "LET" },
-      { tipo: "KEYWORD", valor: "const", subtipo: "CONST" },
-      { tipo: "KEYWORD", valor: "var", subtipo: "VAR" },
-      { tipo: "KEYWORD", valor: "function", subtipo: "FUNCTION" },
-      { tipo: "KEYWORD", valor: "if", subtipo: "IF" },
-      { tipo: "KEYWORD", valor: "else", subtipo: "ELSE" },
-      { tipo: "KEYWORD", valor: "while", subtipo: "WHILE" },
-      { tipo: "KEYWORD", valor: "for", subtipo: "FOR" },
-      { tipo: "KEYWORD", valor: "return", subtipo: "RETURN" },
+      { tipo: "KEYWORD", valor: "LET" },
+      { tipo: "KEYWORD", valor: "CONST" },
+      { tipo: "KEYWORD", valor: "VAR" },
+      { tipo: "KEYWORD", valor: "FUNCTION" },
+      { tipo: "KEYWORD", valor: "IF" },
+      { tipo: "KEYWORD", valor: "ELSE" },
+      { tipo: "KEYWORD", valor: "WHILE" },
+      { tipo: "KEYWORD", valor: "FOR" },
+      { tipo: "KEYWORD", valor: "RETURN" },
       { tipo: "EOF", valor: "EOF" },
     ]);
   });
@@ -175,7 +175,7 @@ describe("LexAnalyzer", () => {
     const tokens = analyzer.tokenize("let\t x\n =  \n 5");
 
     expect(tokens).toEqual([
-      { tipo: "KEYWORD", valor: "let", subtipo: "LET" },
+      { tipo: "KEYWORD", valor: "LET" },
       { tipo: "IDENTIFICADOR", valor: "x" },
       { tipo: "OPERADOR", valor: "=" },
       { tipo: "NUMERO", valor: "5" },
@@ -199,19 +199,19 @@ describe("LexAnalyzer", () => {
     );
 
     expect(tokens).toEqual([
-      { tipo: "KEYWORD", valor: "let", subtipo: "LET" },
+      { tipo: "KEYWORD", valor: "LET" },
       { tipo: "IDENTIFICADOR", valor: "x" },
       { tipo: "OPERADOR", valor: "=" },
       { tipo: "NUMERO", valor: "10" },
       { tipo: "DELIMITADOR", valor: ";" },
-      { tipo: "KEYWORD", valor: "if", subtipo: "IF" },
+      { tipo: "KEYWORD", valor: "IF" },
       { tipo: "DELIMITADOR", valor: "(" },
       { tipo: "IDENTIFICADOR", valor: "x" },
       { tipo: "OPERADOR", valor: ">" },
       { tipo: "NUMERO", valor: "5" },
       { tipo: "DELIMITADOR", valor: ")" },
       { tipo: "DELIMITADOR", valor: "{" },
-      { tipo: "KEYWORD", valor: "return", subtipo: "RETURN" },
+      { tipo: "KEYWORD", valor: "RETURN" },
       { tipo: "BOOLEAN", valor: "true" },
       { tipo: "DELIMITADOR", valor: ";" },
       { tipo: "DELIMITADOR", valor: "}" },
