@@ -1,1 +1,6 @@
 theme: jekyll-theme-cayman
+
+title: Compilador JavaScript → Go
+description: Projeto acadêmico da disciplina de Compiladores
+
+show_downloads: false
