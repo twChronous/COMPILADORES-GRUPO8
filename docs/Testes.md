@@ -39,21 +39,71 @@ Arquivo de testes: `src/analyzers/Lexycal.analyzer.spec.ts`.
 <details>
 <summary>Casos de teste implementados</summary>
 
-| Caso | Descrição |
-| --- | --- |
-| `a = 1 + 2` | Produz a lista completa de tokens |
-| Caractere inválido (`@`) | Lança `TypeError` com mensagem de posição |
-| Palavras-chave | Reconhece `let`, `const`, `var`, `function`, `if`, `else`, `while`, `for`, `return` com o subtipo correto |
-| Identificadores | Reconhece identificadores, incluindo underline e dígitos |
-| Números | Reconhece inteiros e decimais |
-| Strings | Reconhece aspas duplas, aspas simples e string vazia |
-| Booleanos | Reconhece `true` e `false` |
-| Operadores | Reconhece aritméticos, de atribuição, relacionais e lógicos |
-| `===` | Normaliza o operador `===` para `==` |
-| Delimitadores | Reconhece `{ } ( ) ; , .` |
-| Espaços em branco | Ignora espaços, tabulações e quebras de linha |
-| Entrada vazia | Entrada vazia ou só com espaços gera apenas o token `EOF` |
-| Programa completo | `let x = 10; if (x > 5) { return true; }` produz a sequência correta |
-| Erro no meio da entrada | Caractere inválido reporta a posição correta |
+<table>
+<thead>
+<tr>
+<th>Caso</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a = 1 + 2</code></td>
+<td>Produz a lista completa de tokens</td>
+</tr>
+<tr>
+<td>Caractere inválido (<code>@</code>)</td>
+<td>Lança <code>TypeError</code> com mensagem de posição</td>
+</tr>
+<tr>
+<td>Palavras-chave</td>
+<td>Reconhece <code>let</code>, <code>const</code>, <code>var</code>, <code>function</code>, <code>if</code>, <code>else</code>, <code>while</code>, <code>for</code>, <code>return</code> com o subtipo correto</td>
+</tr>
+<tr>
+<td>Identificadores</td>
+<td>Reconhece identificadores, incluindo underline e dígitos</td>
+</tr>
+<tr>
+<td>Números</td>
+<td>Reconhece inteiros e decimais</td>
+</tr>
+<tr>
+<td>Strings</td>
+<td>Reconhece aspas duplas, aspas simples e string vazia</td>
+</tr>
+<tr>
+<td>Booleanos</td>
+<td>Reconhece <code>true</code> e <code>false</code></td>
+</tr>
+<tr>
+<td>Operadores</td>
+<td>Reconhece aritméticos, de atribuição, relacionais e lógicos</td>
+</tr>
+<tr>
+<td><code>===</code></td>
+<td>Normaliza o operador <code>===</code> para <code>==</code></td>
+</tr>
+<tr>
+<td>Delimitadores</td>
+<td>Reconhece <code>{ } ( ) ; , .</code></td>
+</tr>
+<tr>
+<td>Espaços em branco</td>
+<td>Ignora espaços, tabulações e quebras de linha</td>
+</tr>
+<tr>
+<td>Entrada vazia</td>
+<td>Entrada vazia ou só com espaços gera apenas o token <code>EOF</code></td>
+</tr>
+<tr>
+<td>Programa completo</td>
+<td><code>let x = 10; if (x &gt; 5) { return true; }</code> produz a sequência correta</td>
+</tr>
+<tr>
+<td>Erro no meio da entrada</td>
+<td>Caractere inválido reporta a posição correta</td>
+</tr>
+</tbody>
+</table>
 
 </details>
