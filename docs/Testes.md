@@ -37,7 +37,11 @@ adicionada a este documento.
 Arquivo de testes: `src/analyzers/Lexycal.analyzer.spec.ts`.
 
 <details>
-<summary>Casos de teste implementados</summary>
+<summary>
+  <kbd>▶</kbd>
+  <strong>Casos de teste implementados</strong>
+  <em>(clique para expandir)</em>
+</summary>
 
 <table>
 <thead>
