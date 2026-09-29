@@ -1,41 +1,12 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, argsProps } from "../utils/types";
+import { ClientInterface, TokensType, argsProps, lexicTokens } from "../utils/types";
+import { PALAVRAS_CHAVE, Palavras_Reservadas } from "../utils/wordlist";
 
-const Palavras_Reservadas = {
-  NUMERO: 'NUMERO',
-  STRING: 'STRING',
-  BOOLEAN: 'BOOLEAN',
-  IDENTIFICADOR: 'IDENTIFICADOR',
-  KEYWORD: 'KEYWORD',
-  OPERADOR: 'OPERADOR', // aritméticos, atribuição, relacionais e lógicos
-  DELIMITADOR: 'DELIMITADOR', // delimitadores de escopo []
-  EOF: 'EOF'              // Fim do arquivo (End of File)
-};
-
-const PALAVRAS_CHAVE: Record<string, string> = {
-  'let': 'LET',      
-  'const': 'CONST',          
-  'var': 'VAR', 
-  'function': 'FUNCTION',
-  'if': 'IF',
-  'else': 'ELSE',
-  'while': 'WHILE',
-  'for': 'FOR',
-  'return': 'RETURN',
-  'true': 'TRUE',
-  'false': 'FALSE'
-};
-
-interface analisarLexicoOut {
-  tipo: string,
-  valor: string,
-  subtipo?: string;
-}
 export default class LexAnalyzer extends AnalyzerModel {
   constructor(compiler: ClientInterface) {
     super(compiler, {
         name: "Lexico",
-        description: "Analise Léxica do compilador"
+        description: "Analise Léxica do compilador, devolve faz a tokenização da entrada"
     })
   }
 
@@ -49,7 +20,7 @@ export default class LexAnalyzer extends AnalyzerModel {
    */
   public run(args: argsProps): boolean {
     const tokens = this.tokenize(String(args.input));
-    this.client.LOG(JSON.stringify(tokens));
+    this.client.tokens = tokens;
     return true;
   }
 
@@ -59,11 +30,11 @@ export default class LexAnalyzer extends AnalyzerModel {
    * @method tokenize
    * @public
    * @description Faz a analise lexica em si
-   * @returns {Array<analisarLexicoOut>}
+   * @returns {Array<lexicTokens>}
    */
-  public tokenize(entrada: string): Array<analisarLexicoOut> {
+  public tokenize(entrada: string): Array<lexicTokens> {
     let atual = 0;
-    const tokens: analisarLexicoOut[] = [];
+    const tokens: lexicTokens[] = [];
 
     while (atual < entrada.length) {
       let caractere = entrada[atual];
@@ -76,7 +47,7 @@ export default class LexAnalyzer extends AnalyzerModel {
 
       // 2. Reconhecer Delimitadores de Escopo e Pontuação
       if (/[{}();,.]/.test(caractere)) {
-        tokens.push({ tipo: Palavras_Reservadas.DELIMITADOR, valor: caractere });
+        tokens.push({ tipo: Palavras_Reservadas.DELIMITADOR as TokensType, valor: caractere });
         atual++;
         continue;
       }
@@ -92,7 +63,7 @@ export default class LexAnalyzer extends AnalyzerModel {
           atual++;
         }
         atual++; 
-        tokens.push({ tipo: Palavras_Reservadas.STRING, valor });
+        tokens.push({ tipo: Palavras_Reservadas.STRING as TokensType, valor });
         continue;
       }
 
@@ -104,7 +75,7 @@ export default class LexAnalyzer extends AnalyzerModel {
           valor += entrada[atual];
           atual++;
         }
-        tokens.push({ tipo: Palavras_Reservadas.NUMERO, valor });
+        tokens.push({ tipo: Palavras_Reservadas.NUMERO as TokensType, valor });
         continue;
       }
 
@@ -116,18 +87,20 @@ export default class LexAnalyzer extends AnalyzerModel {
           atual++;
         }
 
-      if (PALAVRAS_CHAVE[valor]) {
-        if (valor === 'true' || valor === 'false') {
-            tokens.push({ tipo: Palavras_Reservadas.BOOLEAN, valor });
-        } else {
-            tokens.push({ tipo: Palavras_Reservadas.KEYWORD, valor, subtipo: PALAVRAS_CHAVE[valor] });
-        }
-      } else {
-        tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR, valor });
-      }
-
-        continue;
-      }
+          const valorNormalizado = valor.toLowerCase();
+            if (PALAVRAS_CHAVE[valorNormalizado]) {
+              if (valorNormalizado === 'true' || valorNormalizado === 'false') {
+                tokens.push({ tipo: Palavras_Reservadas.BOOLEAN as TokensType, valor: valorNormalizado });
+              } else {
+                // Salva a KEYWORD (ex: 'LET', 'IF')
+                tokens.push({ tipo: Palavras_Reservadas.KEYWORD as TokensType, valor: PALAVRAS_CHAVE[valorNormalizado] });
+              }
+            } else {
+              // Se for uma variável, mantemos o Case original (ex: 'meuValor' não vira 'meuvalor')
+              tokens.push({ tipo: Palavras_Reservadas.IDENTIFICADOR as TokensType, valor });
+            }
+            continue;
+          }
 
      // 6. Reconhecer Operadores amplos 
       if (/[+\-*/%=<>!&|]/.test(caractere)) {
@@ -139,7 +112,7 @@ export default class LexAnalyzer extends AnalyzerModel {
         
         if (valor === '===') valor = '=='; 
         
-        tokens.push({ tipo: Palavras_Reservadas.OPERADOR, valor });
+        tokens.push({ tipo: Palavras_Reservadas.OPERADOR as TokensType, valor });
         continue;
       }
 
@@ -148,8 +121,7 @@ export default class LexAnalyzer extends AnalyzerModel {
     }
 
     // Adicionar token indicando o fim do código
-    tokens.push({ tipo: Palavras_Reservadas.EOF, valor: 'EOF' });
-    console.log(tokens); //LOG PARA DEIXAR VISUAL
+    tokens.push({ tipo: Palavras_Reservadas.EOF as TokensType, valor: 'EOF' });
     return tokens;
   }
 }
