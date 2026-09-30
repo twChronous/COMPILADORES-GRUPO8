@@ -33,6 +33,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     while (this.espiar().tipo !== 'EOF') {
       corpo.push(this.parseStatement());
     }
+    this.client.ast = corpo;
     console.log(corpo);
     return true;
   }

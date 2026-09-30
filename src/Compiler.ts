@@ -13,6 +13,7 @@ export default class Compiler implements ClientInterface {
 
   public analyzers: any[];
   public tokens: lexicTokens[];
+  public ast: ClientInterface["ast"];
     /**
      * Construtor da classe Compiler
      * Inicializa a aplicação Express e configura middlewares
