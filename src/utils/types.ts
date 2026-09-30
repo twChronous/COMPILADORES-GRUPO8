@@ -4,6 +4,8 @@
  */
 export interface ClientInterface {
     tokens: lexicTokens[];
+    /** Programa produzido pelo analisador sintático e anotado pelo semântico. */
+    ast?: NoStatement[];
     analyzers: AnalyzerModelOptions[];
     /**
      * Método para log de informações gerais
@@ -89,3 +91,56 @@ export interface lexicTokens {
  * Possiveis tipos de tokens gerados pela analise léxica
  */
 export type TokensType = "KEYWORD" | "IDENTIFICADOR" | "NUMERO" | "OPERADOR" | "EOF" | "BOOLEAN" | "STRING" | "DELIMITADOR"
+
+/** Tipos de dados do subconjunto já reconhecido pelo analisador sintático. */
+export type TipoSemantico = "number" | "string" | "boolean";
+
+export interface NoLiteral {
+  tipo: "Literal";
+  tipoDado: "NUMERO" | "STRING" | "BOOLEAN";
+  valor: string;
+  tipoInferido?: TipoSemantico;
+}
+
+export interface NoIdentificador {
+  tipo: "Identificador";
+  nome: string;
+  tipoInferido?: TipoSemantico;
+}
+
+export interface NoExpressaoBinaria {
+  tipo: "ExpressaoBinaria";
+  operador: string;
+  esquerda: NoExpressao;
+  direita: NoExpressao;
+  tipoInferido?: TipoSemantico;
+}
+
+export type NoExpressao = NoLiteral | NoIdentificador | NoExpressaoBinaria;
+
+export interface NoDeclaracaoVariavel {
+  tipo: "DeclaracaoVariavel";
+  modificador: "let" | "const" | "var";
+  nome: string;
+  valorInicial: NoExpressao;
+  tipoInferido?: TipoSemantico;
+}
+
+export interface NoBloco {
+  tipo: "Bloco";
+  corpo: NoStatement[];
+}
+
+export interface NoDeclaracaoIf {
+  tipo: "DeclaracaoIf";
+  condicao: NoExpressao;
+  consequencia: NoBloco;
+  alternativa: NoBloco | null;
+}
+
+export interface NoExpressaoStatement {
+  tipo: "ExpressaoStatement";
+  expressao: NoExpressao;
+}
+
+export type NoStatement = NoDeclaracaoVariavel | NoDeclaracaoIf | NoExpressaoStatement;
