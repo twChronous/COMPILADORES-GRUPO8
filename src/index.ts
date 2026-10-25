@@ -26,4 +26,5 @@ export interface argsProps {
   //console.log(comp.tokens)
   const Sint = comp.analyzers.find(element => element.name == "Sintatico")
   Sint.run()
+  console.log(comp.ast)
 })();
