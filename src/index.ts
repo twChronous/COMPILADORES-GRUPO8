@@ -14,7 +14,7 @@ export interface argsProps {
     input: `
     let x = 10 + 20 + A; 
     IF (x > 10) {
-      x + 1
+      x + 1;
     }
     x + 2;
     ` // caso adicione o caracter desconhecido "/", por exemplo ele acusa falha

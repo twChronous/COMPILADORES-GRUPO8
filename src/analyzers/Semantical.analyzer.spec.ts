@@ -15,29 +15,44 @@ function cliente(): ClientInterface {
   };
 }
 
-const num = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "NUMERO" as const, valor });
-const str = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "STRING" as const, valor });
-const bool = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "BOOLEAN" as const, valor });
-const id = (nome: string) => ({ tipo: "Identificador" as const, nome });
+// Valores fixos de localização para evitar poluição nos mocks de teste
+const l = 1;
+const c = 1;
+
+const num = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "NUMERO" as const, valor, linha: l, coluna: c });
+const str = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "STRING" as const, valor, linha: l, coluna: c });
+const bool = (valor: string) => ({ tipo: "Literal" as const, tipoDado: "BOOLEAN" as const, valor, linha: l, coluna: c });
+const id = (nome: string) => ({ tipo: "Identificador" as const, nome, linha: l, coluna: c });
+
 const bin = (operador: string, esquerda: any, direita: any) => ({
   tipo: "ExpressaoBinaria" as const,
   operador,
   esquerda,
   direita,
+  linha: l,
+  coluna: c
 });
+
 const decl = (modificador: "let" | "const" | "var", nome: string, valorInicial: any): NoStatement => ({
   tipo: "DeclaracaoVariavel",
   modificador,
   nome,
   valorInicial,
+  linha: l,
+  coluna: c
 });
-const expr = (expressao: any): NoStatement => ({ tipo: "ExpressaoStatement", expressao });
-const bloco = (corpo: NoStatement[]) => ({ tipo: "Bloco" as const, corpo });
+
+const expr = (expressao: any): NoStatement => ({ tipo: "ExpressaoStatement", expressao, linha: l, coluna: c });
+
+const bloco = (corpo: NoStatement[]) => ({ tipo: "Bloco" as const, corpo, linha: l, coluna: c });
+
 const se = (condicao: any, consequencia: NoStatement[], alternativa: NoStatement[] | null = null): NoStatement => ({
   tipo: "DeclaracaoIf",
   condicao,
   consequencia: bloco(consequencia),
   alternativa: alternativa ? bloco(alternativa) : null,
+  linha: l,
+  coluna: c
 });
 
 describe("SemanticalAnalyzer", () => {
@@ -56,7 +71,7 @@ describe("SemanticalAnalyzer", () => {
     const analyzer = new SemanticalAnalyzer(cliente());
 
     expect(() => analyzer.analisar([expr(id("a"))])).toThrow(
-      "Erro Semântico: variável 'a' não declarada"
+      /A variável 'a' não foi declarada/
     );
   });
 
@@ -65,7 +80,7 @@ describe("SemanticalAnalyzer", () => {
 
     expect(() =>
       analyzer.analisar([decl("let", "x", num("1")), decl("const", "x", num("2"))])
-    ).toThrow("Erro Semântico: 'x' já foi declarado neste escopo");
+    ).toThrow(/A variável 'x' já foi declarada neste escopo/);
   });
 
   test("analisar: variável do escopo externo é visível no bloco do if", () => {
@@ -86,7 +101,7 @@ describe("SemanticalAnalyzer", () => {
         se(bool("true"), [decl("let", "y", num("1"))]),
         expr(id("y")),
       ])
-    ).toThrow("Erro Semântico: variável 'y' não declarada");
+    ).toThrow(/A variável 'y' não foi declarada/);
   });
 
   test("analisar: const não pode ser reatribuída", () => {
@@ -97,7 +112,7 @@ describe("SemanticalAnalyzer", () => {
         decl("const", "x", num("1")),
         expr(bin("=", id("x"), num("2"))),
       ])
-    ).toThrow("Erro Semântico: não é possível reatribuir a constante 'x'");
+    ).toThrow(/Não é possível reatribuir valor à constante 'x'/);
   });
 
   test("analisar: let aceita reatribuição do mesmo tipo", () => {
@@ -121,14 +136,14 @@ describe("SemanticalAnalyzer", () => {
         decl("let", "x", num("1")),
         expr(bin("=", id("x"), str("a"))),
       ])
-    ).toThrow("Erro Semântico: atribuição incompatível para 'x': esperado 'number', encontrado 'string'");
+    ).toThrow(/Atribuição incompatível para 'x'/);
   });
 
   test("analisar: condição do if precisa ser boolean", () => {
     const analyzer = new SemanticalAnalyzer(cliente());
 
     expect(() => analyzer.analisar([se(num("1"), [])])).toThrow(
-      "Erro Semântico: condição do if deve ser boolean, encontrado 'number'"
+      /A condição do 'if' deve ser boolean/
     );
   });
 
@@ -139,7 +154,7 @@ describe("SemanticalAnalyzer", () => {
     expect(ok).toMatchObject({ tipoInferido: "number" });
 
     expect(() => analyzer.analisar([decl("let", "s", bin("+", str("a"), num("1")))])).toThrow(
-      "Erro Semântico: operador '+' não aceita operandos 'string' e 'number'"
+      /O operador '\+' não aceita os operandos de tipos 'string' e 'number'/
     );
   });
 

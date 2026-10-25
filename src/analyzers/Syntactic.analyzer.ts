@@ -1,10 +1,10 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, lexicTokens, NoStatement, TokensType } from "../utils/types";
+import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf } from "../utils/types";
 
 /**
- * Representa um erro ocorrido durante a análise sintática.
+ * Representa um erro encontrado durante a análise sintática.
  */
-class ParseError extends Error {
+export class ParseError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ParseError";
@@ -12,21 +12,22 @@ class ParseError extends Error {
 }
 
 /**
- * Analisa a sintaxe do código-fonte utilizando uma abordagem preditiva (Top-Down).
- * Esta classe converte a lista de tokens em uma Árvore Sintática Abstrata (AST) e lida com a recuperação de erros.
+ * Realiza a análise sintática do código-fonte.
+ * Esta classe converte a lista de tokens em uma Árvore Sintática Abstrata (AST).
+ * Ela também gerencia a precedência de operadores e recupera falhas automaticamente (Panic Mode).
  */
 export default class SyntacticAnalyzer extends AnalyzerModel {
-  /** O índice do token que está sendo analisado no momento. */
+  /** Índice do token atual em processamento. */
   private atual = 0;
   
-  /** Armazena a lista de erros de sintaxe encontrados. */
+  /** Lista de mensagens de erro encontradas na análise. */
   private erros: string[] = [];
-  
+
   /** 
-   * Mapeia as palavras-chave para suas respectivas funções de análise.
-   * Isso elimina a necessidade de longas estruturas if/else.
+   * Tabela de roteamento para instruções.
+   * Redireciona a palavra-chave para a sua função de análise correspondente.
    */
-  private readonly roteadorStatement: Record<string, () => any> = {
+  private readonly roteadorStatement: Record<string, () => NoStatement> = {
     LET: () => this.parseDeclaration(),
     CONST: () => this.parseDeclaration(),
     VAR: () => this.parseDeclaration(),
@@ -34,29 +35,31 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   };
 
   /**
-   * Inicializa o analisador sintático.
+   * Prepara o analisador sintático.
    * 
-   * @param compiler A interface do cliente do compilador, contendo os tokens e métodos de log.
+   * @param compiler O cliente que contém os tokens e a interface do compilador.
    */
   constructor(compiler: ClientInterface) {
     super(compiler, {
       name: "Sintatico",
-      description: "Analise sintática do compilador"
+      description: "Análise sintática com precedência matemática e recuperação de erros."
     });
+    this.client.errosSintaticos = this.erros;
   }
 
   /**
    * Inicia o processo de análise sintática.
-   * Lê tokens até encontrar o final do arquivo (EOF) e constrói a AST.
-   * Se erros forem encontrados, eles serão registrados no sistema de logs.
+   * O método lê os tokens até encontrar o final do arquivo (EOF).
    * 
-   * @returns Retorna `true` se a árvore foi construída sem erros, caso contrário, `false`.
+   * @returns Retorna `true` se a AST for construída sem erros. Retorna `false` se houver erros.
    */
   public run(): boolean {
     const corpo: NoStatement[] = [];
-    while (this.espiar().tipo !== 'EOF') {
+    while (this.atual < this.client.tokens.length && this.espiar().tipo !== 'EOF') {
       const stmt = this.parseStatement();
-      if (stmt) corpo.push(stmt);
+      if (stmt !== null) {
+        corpo.push(stmt);
+      }
     }
     this.client.ast = corpo;
     
@@ -68,32 +71,35 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   }
 
   /**
-   * Retorna o token atual sem consumi-lo (sem avançar o índice).
+   * Lê o token atual sem avançar o índice.
    * 
    * @returns O token na posição atual.
    */
   private espiar(): lexicTokens {
+    if (this.atual >= this.client.tokens.length) {
+      return this.client.tokens[this.client.tokens.length - 1];
+    }
     return this.client.tokens[this.atual];
   }
 
   /**
-   * Verifica se o token atual corresponde ao tipo e valor especificados.
+   * Verifica se o token atual tem o tipo e o valor esperados.
    * 
    * @param tipo O tipo de token esperado.
    * @param valor O valor do token esperado (opcional).
-   * @returns Retorna `true` se o token coincidir; caso contrário, `false`.
+   * @returns Retorna `true` se o token corresponder aos critérios.
    */
-  private ehToken(tipo: TokensType, valor?: any): boolean {
+  private ehToken(tipo: TokensType, valor?: string): boolean {
     const token = this.espiar();
     return token.tipo === tipo && (valor === undefined || token.valor === valor);
   }
 
   /**
-   * Registra e cria uma instância de ParseError.
+   * Cria e registra um erro de sintaxe.
    * 
-   * @param token O token problemático para registrar a localização (linha/coluna).
-   * @param mensagem A mensagem detalhando o erro.
-   * @returns A exceção ParseError recém-criada.
+   * @param token O token que causou o problema.
+   * @param mensagem A descrição do erro.
+   * @returns Uma nova exceção do tipo `ParseError`.
    */
   private erro(token: lexicTokens, mensagem: string): ParseError {
     const msg = `[Linha ${token.linha}:${token.coluna}] Erro de Sintaxe: ${mensagem}`;
@@ -102,121 +108,170 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   }
 
   /**
-   * Tenta consumir o token atual se ele corresponder aos critérios.
-   * Se o token atual não corresponder, a função registrará um erro.
+   * Consome o token atual se ele for igual ao esperado.
+   * Se o token for diferente, o método interrompe o fluxo com um erro.
    * 
-   * @param tipoEsperado O tipo de token que a gramática espera.
-   * @param valorEsperado O valor do token que a gramática espera (opcional).
-   * @returns O token consumido.
-   * @throws Um `ParseError` se o token não for o esperado.
+   * @param tipoEsperado O tipo do token que a gramática exige.
+   * @param valorEsperado O valor do token que a gramática exige (opcional).
+   * @returns O token que foi consumido.
    */
-  private consumir(tipoEsperado: TokensType, valorEsperado?: any): lexicTokens {
+  private consumir(tipoEsperado: TokensType, valorEsperado?: string): lexicTokens {
     const token = this.espiar();
-    const valido = token.tipo === tipoEsperado && (valorEsperado === undefined || token.valor === valorEsperado);
-
-    if (!valido) {
-      throw this.erro(token, `Esperado tipo '${tipoEsperado}'${valorEsperado ? ` com valor '${valorEsperado}'` : ''}, mas encontrou tipo '${token.tipo}' com valor '${token.valor}'`);
+    if (token.tipo === tipoEsperado && (valorEsperado === undefined || token.valor === valorEsperado)) {
+      this.atual++;
+      return token;
     }
-
-    this.atual++;
-    return token;
+    throw this.erro(token, `Esperado '${valorEsperado || tipoEsperado}', mas encontrou '${token.valor}'`);
   }
 
   /**
-   * Consome o token atual apenas se ele corresponder aos critérios fornecidos, mas não gera erro caso contrário.
-   * Usado para elementos opcionais na sintaxe, como o `;`.
+   * Consome o token atual apenas se ele for igual ao esperado.
+   * O método não gera erro se o token for diferente.
    * 
    * @param tipo O tipo de token desejado.
    * @param valor O valor do token desejado (opcional).
    */
-  private consumirOpcional(tipo: TokensType, valor?: any): void {
+  private consumirOpcional(tipo: TokensType, valor?: string): void {
     if (this.ehToken(tipo, valor)) {
       this.atual++;
     }
   }
 
   /**
-   * Recupera o analisador de um estado de erro avançando tokens de forma segura.
-   * A sincronização busca pelo próximo ponto de encerramento, como um `;` ou o início de uma nova declaração.
+   * Recupera a análise de um erro sintático (Panic Mode).
+   * O método avança os tokens até encontrar um delimitador seguro (como `;` ou uma nova instrução).
    */
   private sincronizar(): void {
     this.atual++;
-    while (this.espiar().tipo !== 'EOF') {
+    while (this.atual < this.client.tokens.length && this.espiar().tipo !== 'EOF') {
       if (this.client.tokens[this.atual - 1].valor === ';') return;
+      
       const tipo = this.espiar().tipo;
-      if (tipo === 'KEYWORD' && ['LET', 'CONST', 'VAR', 'IF'].includes(this.espiar().valor)) return;
+      if (tipo === 'KEYWORD' && ['LET', 'CONST', 'VAR', 'IF'].includes(this.espiar().valor)) {
+        return;
+      }
       this.atual++;
     }
   }
 
   /**
-   * Analisa um valor literal (Número, String, Booleano) ou um Identificador.
+   * Analisa um valor básico (Número, String, Booleano) ou uma sub-expressão entre parênteses.
    * 
-   * @returns O nó da AST correspondente ao valor.
-   * @throws Lança um `ParseError` se o token não representar um valor válido.
+   * @returns O nó correspondente na AST.
    */
-  private parseValue() {
+  private parseValue(): NoExpressao {
     const token = this.espiar();
     const coordenadas = { linha: token.linha, coluna: token.coluna };
 
-    const construtores: Partial<Record<TokensType, () => any>> = {
-      NUMERO: () => ({ ...coordenadas, tipo: 'Literal', tipoDado: token.tipo, valor: token.valor }),
-      STRING: () => ({ ...coordenadas, tipo: 'Literal', tipoDado: token.tipo, valor: token.valor }),
-      BOOLEAN: () => ({ ...coordenadas, tipo: 'Literal', tipoDado: token.tipo, valor: token.valor }),
-      IDENTIFICADOR: () => ({ ...coordenadas, tipo: 'Identificador', nome: token.valor })
-    };
-
-    const criarNo = construtores[token.tipo];
-    if (!criarNo) {
-      throw this.erro(token, `Expressão inválida: token inesperado '${token.valor}'`);
+    if (token.tipo === 'NUMERO' || token.tipo === 'STRING' || token.tipo === 'BOOLEAN') {
+      this.atual++;
+      return { ...coordenadas, tipo: 'Literal', tipoDado: token.tipo as "NUMERO" | "STRING" | "BOOLEAN", valor: token.valor };
+    }
+    
+    if (token.tipo === 'IDENTIFICADOR') {
+      this.atual++;
+      return { ...coordenadas, tipo: 'Identificador', nome: token.valor };
+    }
+    
+    if (this.ehToken('DELIMITADOR', '(')) {
+      this.consumir('DELIMITADOR', '(');
+      const expr = this.parseExpression();
+      this.consumir('DELIMITADOR', ')');
+      return expr;
     }
 
-    this.atual++;
-    return criarNo();
+    throw this.erro(token, `Expressão inválida: token inesperado '${token.valor}'`);
   }
 
   /**
-   * Analisa expressões matemáticas e lógicas, agrupando-as na AST.
-   * O código constrói uma árvore com os operadores mantendo a relação entre os lados esquerdo e direito.
+   * Analisa a precedência de multiplicação, divisão e módulo.
    * 
-   * @returns O nó da árvore com a expressão estruturada.
+   * @returns O nó com a operação matemática estruturada.
    */
-  private parseExpression() {
+  private parseFator(): NoExpressao {
     let esquerda = this.parseValue();
-
-    while (this.ehToken('OPERADOR')) {
+    
+    while (this.ehToken('OPERADOR', '*') || this.ehToken('OPERADOR', '/') || this.ehToken('OPERADOR', '%')) {
       const operador = this.consumir('OPERADOR');
       const direita = this.parseValue();
-
-      esquerda = {
-        tipo: 'ExpressaoBinaria',
-        operador: operador.valor,
-        esquerda,
-        direita,
-        linha: operador.linha, 
-        coluna: operador.coluna
-      };
+      esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-
+    
     return esquerda;
   }
 
   /**
-   * Analisa uma declaração de variável (let, const, var).
-   * O método consome o nome, a atribuição, o valor inicial e o ponto-e-vírgula opcional.
+   * Analisa a precedência de adição e subtração.
    * 
-   * @returns O nó da árvore com os dados da declaração.
+   * @returns O nó com a operação matemática estruturada.
    */
-  private parseDeclaration() {
+  private parseTermo(): NoExpressao {
+    let esquerda = this.parseFator();
+    
+    while (this.ehToken('OPERADOR', '+') || this.ehToken('OPERADOR', '-')) {
+      const operador = this.consumir('OPERADOR');
+      const direita = this.parseFator();
+      esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
+    }
+    
+    return esquerda;
+  }
+
+  /**
+   * Analisa operadores relacionais e lógicos.
+   * 
+   * @returns O nó lógico estruturado na AST.
+   */
+  private parseComparacao(): NoExpressao {
+    let esquerda = this.parseTermo();
+    
+    while (
+      this.ehToken('OPERADOR', '>') || this.ehToken('OPERADOR', '<') || 
+      this.ehToken('OPERADOR', '>=') || this.ehToken('OPERADOR', '<=') || 
+      this.ehToken('OPERADOR', '==') || this.ehToken('OPERADOR', '!=') ||
+      this.ehToken('OPERADOR', '&&') || this.ehToken('OPERADOR', '||')
+    ) {
+      const operador = this.consumir('OPERADOR');
+      const direita = this.parseTermo();
+      esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
+    }
+    
+    return esquerda;
+  }
+
+  /**
+   * Analisa a expressão completa, incluindo as atribuições da direita para a esquerda.
+   * 
+   * @returns O nó principal da expressão na AST.
+   */
+  private parseExpression(): NoExpressao {
+    let esquerda = this.parseComparacao();
+    
+    if (this.ehToken('OPERADOR', '=') || this.ehToken('OPERADOR', '+=') || this.ehToken('OPERADOR', '-=')) {
+      const operador = this.consumir('OPERADOR');
+      const direita = this.parseExpression(); 
+      return { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
+    }
+    
+    return esquerda;
+  }
+
+  /**
+   * Analisa uma declaração de variável.
+   * 
+   * @returns O nó de declaração na AST.
+   */
+  private parseDeclaration(): NoDeclaracaoVariavel {
     const tkKeyword = this.consumir('KEYWORD');
     const identificador = this.consumir('IDENTIFICADOR');
+    
     this.consumir('OPERADOR', '=');
     const valorInicial = this.parseExpression();
     this.consumirOpcional('DELIMITADOR', ';');
 
     return {
       tipo: 'DeclaracaoVariavel',
-      modificador: tkKeyword.valor.toLowerCase(),
+      modificador: tkKeyword.valor.toLowerCase() as "let" | "const" | "var",
       nome: identificador.valor,
       valorInicial,
       linha: tkKeyword.linha,
@@ -225,17 +280,17 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   }
 
   /**
-   * Analisa um bloco de código aninhado (delimitado por `{ }`).
+   * Analisa um bloco de código contido entre chaves.
    * 
-   * @returns O nó da árvore representando o bloco e seus statements filhos.
+   * @returns O nó de bloco com seus comandos filhos.
    */
-  private parseBloco() {
+  private parseBloco(): NoBloco {
     const tk = this.consumir('DELIMITADOR', '{');
-    const corpo = [];
+    const corpo: NoStatement[] = [];
 
     while (!this.ehToken('DELIMITADOR', '}') && this.espiar().tipo !== 'EOF') {
       const stmt = this.parseStatement();
-      if (stmt) {
+      if (stmt !== null) {
         corpo.push(stmt);
       }
     }
@@ -245,13 +300,13 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   }
 
   /**
-   * Analisa uma declaração condicional (if/else).
-   * Processa a condição em parênteses e executa a verificação dos blocos de consequência e alternativa.
+   * Analisa uma estrutura condicional if/else.
    * 
-   * @returns O nó da AST para a declaração condicional.
+   * @returns O nó condicional estruturado na AST.
    */
-  private parseIf() {
+  private parseIf(): NoDeclaracaoIf {
     const tk = this.consumir('KEYWORD', 'IF');
+    
     this.consumir('DELIMITADOR', '(');
     const condicao = this.parseExpression();
     this.consumir('DELIMITADOR', ')');
@@ -259,7 +314,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     const consequencia = this.parseBloco();
 
     const alternativa = this.ehToken('KEYWORD', 'ELSE')
-      ? this.parseBlocoElse()
+      ? (this.consumir('KEYWORD', 'ELSE'), this.parseBloco())
       : null;
 
     return {
@@ -267,38 +322,37 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       condicao,
       consequencia,
       alternativa,
-      linha: tk.linha, 
+      linha: tk.linha,
       coluna: tk.coluna
     };
   }
 
   /**
-   * Analisa o bloco `else` de uma estrutura condicional.
+   * Roteia o comando atual para a função de análise correta.
+   * Caso ocorra um erro de sintaxe, o método captura a exceção e inicia o processo de recuperação.
    * 
-   * @returns O nó de bloco com as instruções do fallback.
-   */
-  private parseBlocoElse() {
-    this.consumir('KEYWORD', 'ELSE');
-    return this.parseBloco();
-  }
-
-  /**
-   * Redireciona a análise para a função correta dependendo do primeiro token encontrado na instrução atual.
-   * Caso encontre um erro na instrução, utiliza a sincronização para permitir a continuação da análise.
-   * 
-   * @returns O nó do comando estruturado na AST ou `null` caso a análise precise se recuperar de um erro.
+   * @returns O nó validado ou `null` se houver erro recuperado.
    */
   private parseStatement(): NoStatement | null {
     try {
       const token = this.espiar();
+      
       if (token.tipo === 'KEYWORD') {
         const parser = this.roteadorStatement[token.valor];
-        if (parser) return parser();
+        if (parser) {
+          return parser();
+        }
       }
       
       const expressao = this.parseExpression();
       this.consumirOpcional('DELIMITADOR', ';');
-      return { tipo: 'ExpressaoStatement', expressao, linha: token.linha, coluna: token.coluna };
+      
+      return {
+        tipo: 'ExpressaoStatement',
+        expressao,
+        linha: token.linha,
+        coluna: token.coluna
+      };
     } catch (e) {
       if (e instanceof ParseError) {
         this.sincronizar();
