@@ -34,7 +34,6 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       corpo.push(this.parseStatement());
     }
     this.client.ast = corpo;
-    console.log(corpo);
     return true;
   }
 
