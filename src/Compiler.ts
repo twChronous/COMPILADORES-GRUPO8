@@ -1,6 +1,6 @@
 import Loaders from "./loaders";
 import AnalyzerLoader from "./loaders/Analyzers.loader";
-import { ClientInterface, lexicTokens, LoaderInitConfig, LoaderResult } from "./utils/types";
+import { ClientInterface, lexicTokens, LoaderInitConfig, LoaderResult, Simbolo } from "./utils/types";
 
 /**
  * Classe Compiler principal que gerencia a aplicação
@@ -14,6 +14,8 @@ export default class Compiler implements ClientInterface {
   public analyzers: any[];
   public tokens: lexicTokens[];
   public ast: ClientInterface["ast"];
+  public tabelaSimbolos?: Simbolo[];
+  
     /**
      * Construtor da classe Compiler
      * Inicializa a aplicação Express e configura middlewares

@@ -9,21 +9,9 @@ import {
   NoExpressaoStatement,
   NoStatement,
   TipoSemantico,
+  Simbolo
 } from "../utils/types";
 
-/**
- * Representa uma variável registrada na tabela de símbolos.
- */
-interface Simbolo {
-  /** O nome da variável. */
-  nome: string;
-  /** O tipo de declaração (let, const ou var). */
-  modificador: "let" | "const" | "var";
-  /** O tipo de dado inferido para a variável. */
-  tipo: TipoSemantico;
-  /** A linha onde a variável foi declarada no código-fonte. */
-  linhaDeclaracao: number;
-}
 
 const OPERADORES_ATRIBUICAO = new Set(["=", "+=", "-="]);
 const OPERADORES_ARITMETICOS = new Set(["-", "*", "/", "%"]);
@@ -41,6 +29,8 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * O índice 0 sempre representa o escopo global.
    */
   private escopos: Map<string, Simbolo>[] = [];
+  private registroSimbolos: Simbolo[] = [];
+  private contadorEscopo = 0;
 
   /**
    * Inicializa o analisador semântico.
@@ -72,6 +62,8 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     } catch (error: any) {
       this.client.LOG_ERR(error.message);
       return false;
+    } finally {
+       this.client.tabelaSimbolos = this.registroSimbolos
     }
   }
 
@@ -84,6 +76,8 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    */
   public analisar(corpo: NoStatement[]): NoStatement[] {
     this.escopos = [new Map()]; // Inicializa o escopo global
+    this.registroSimbolos = [];
+    this.contadorEscopo = 0;
     return corpo.map((statement) => this.verificarStatement(statement));
   }
 
@@ -142,6 +136,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @param bloco O nó do bloco de código.
    */
   private verificarBloco(bloco: NoBloco): void {
+    this.contadorEscopo++;
     this.escopos.push(new Map());
     for (const statement of bloco.corpo) {
       this.verificarStatement(statement);
@@ -174,7 +169,11 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     if (escopoAtual.has(nome)) {
       throw new Error(`Erro Semântico [Linha ${linha}]: A variável '${nome}' já foi declarada neste escopo.`);
     }
-    escopoAtual.set(nome, { nome, modificador, tipo, linhaDeclaracao: linha });
+    const nivelEscopo = this.escopos.length === 1 ? "Global" : `Bloco-${this.contadorEscopo}`;
+    const novoSimbolo: Simbolo = { nome, modificador, tipo, linhaDeclaracao: linha, escopo: nivelEscopo };
+    
+    escopoAtual.set(nome, novoSimbolo);
+    this.registroSimbolos.push(novoSimbolo); // Guarda no histórico permanente
   }
 
   /**

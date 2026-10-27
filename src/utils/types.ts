@@ -1,14 +1,22 @@
 export interface ClientInterface {
   tokens: lexicTokens[];
-  ast?: NoStatement[];
   analyzers: AnalyzerModelOptions[];
-  errosSintaticos?: string[]; // Adicionado para armazenar erros recuperados
+  ast?: NoStatement[];
+  tabelaSimbolos?: Simbolo[];
+  errosSintaticos?: string[]; 
   LOG(...args: string[]): void;
   LOG_ERR(...args: string[]): void;
   LOG_WARN(...args: string[]): void;
   Error(...args: string[]): void;
 }
 
+export interface Simbolo {
+  nome: string;
+  modificador: "let" | "const" | "var";
+  tipo: TipoSemantico;
+  linhaDeclaracao: number;
+  escopo: string;
+}
 export interface LoaderResult {
   name: string;
   success: boolean;

@@ -12,7 +12,7 @@ export interface argsProps {
 (async () => {
   const args: argsProps = {
     input: `
-    let x = 10 + 20 + A; 
+    let x = 10 + 20; 
     IF (x > 10) {
       x + 1;
     }
@@ -26,5 +26,7 @@ export interface argsProps {
   //console.log(comp.tokens)
   const Sint = comp.analyzers.find(element => element.name == "Sintatico")
   Sint.run()
-  console.log(comp.ast)
+  const Semantico = comp.analyzers.find(element => element.name == "Semantico");
+  Semantico.run();
+  console.log(comp.tabelaSimbolos)
 })();
