@@ -31,6 +31,18 @@ para executar normalmente
 ```bash
   bun start
 ```
+para executar com logs
+```bash
+  bun start --verbose
+```
+para imprimir a AST na execução 
+```bash
+  bun start --ast
+```
+para abrir o modo de uso
+```bash
+  bun start --help
+```
 para executar a suite de testes
 ```bash
   bun test

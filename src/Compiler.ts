@@ -2,6 +2,11 @@ import Loaders from "./loaders";
 import AnalyzerLoader from "./loaders/Analyzers.loader";
 import { ClientInterface, lexicTokens, LoaderInitConfig, LoaderResult } from "./utils/types";
 
+export interface CompilerOptions {
+    verbose?: boolean;
+    showAst?: boolean;
+    showTokens?: boolean;
+}
 /**
  * Classe Compiler principal que gerencia a aplicação
  * Implementa a interface ClientInterface
@@ -14,13 +19,21 @@ export default class Compiler implements ClientInterface {
   public analyzers: any[];
   public tokens: lexicTokens[];
   public ast: ClientInterface["ast"];
+
+  public options: CompilerOptions;
+
     /**
      * Construtor da classe Compiler
-     * Inicializa a aplicação Express e configura middlewares
+     * Inicializa a aplicação 
      */
-    constructor() {
+    constructor(options: CompilerOptions = {}) {
       this.analyzers = [];
       this.tokens = [];
+      this.options = {
+            verbose: options.verbose || false,
+            showAst: options.showAst || false,
+            showTokens: options.showTokens || false
+        };
     }
     /**
  * Inicializa todos os loaders da aplicação
@@ -127,15 +140,44 @@ public async initializeLoaders(
 
     return loaderResults;
 }
+/**
+     * Orquestra a execução completa do compilador de forma limpa.
+     * @param input Código fonte para compilar.
+     * @returns boolean indicando sucesso ou falha na compilação.
+     */
+    public async compile(input: string): Promise<boolean> {
+        await this.initializeLoaders();
 
+        const lexer = this.analyzers.find(a => a.name === "Lexico");
+        const parser = this.analyzers.find(a => a.name === "Sintatico");
+        const semantic = this.analyzers.find(a => a.name === "Semantico");
 
+        if (!lexer || !parser || !semantic) {
+            this.LOG_ERR("Analisadores base não foram carregados corretamente.", "SYSTEM");
+            return false;
+        }
 
+        this.LOG("Iniciando Análise Léxica...", "COMPILER");
+        lexer.run({ input });
+
+        this.LOG("Iniciando Análise Sintática...", "COMPILER");
+        const sintaticoOk = parser.run();
+        if (!sintaticoOk) return false;
+
+        this.LOG("Iniciando Análise Semântica...", "COMPILER");
+        const semanticoOk = semantic.run();
+        if (!semanticoOk) return false;
+
+        this.LOG("Compilação finalizada com sucesso.", "COMPILER");
+        return true;
+    }
     /**
      * Registra log de informação colorido no console
      * 
      * @param {...string} args - Argumentos para log
      */
     public LOG(...args: string[]): void {
+        if (!this.options.verbose) return;
         const Sendlog = (args.length > 1 ? `\x1b[32m${args.map(t => `[${t}]`).slice(1).join(' ')}\x1b[0m` : '') + ` \x1b[34m${args[0]}\x1b[0m`;
         console.log(Sendlog);
     }
@@ -157,6 +199,7 @@ public async initializeLoaders(
      * @param {...string} args - Argumentos para log de aviso
      */
     public LOG_WARN(...args: string[]): void {
+        if (!this.options.verbose) return;
         const warning = args[0];
         const Sendlog = (args.length > 1 ? args.slice(1).map(t => `\x1b[33m[${t}]\x1b[0m`) : '');
         console.warn('\x1b[33m[WARNING]\x1b[0m', ...Sendlog, warning);
@@ -178,7 +221,7 @@ public async initializeLoaders(
      * @param {LoaderResult[]} results - Resultados dos loaders
      */
     private logLoaderPerformance(results: LoaderResult[]): void {
-        // Ordenar loaders por tempo de carregamento
+        if (!this.options.verbose) return;
         const sortedByDuration = [...results].sort((a, b) => b.duration - a.duration);
 
         this.LOG('Loader Performance Breakdown:', 'PERFORMANCE');
