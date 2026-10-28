@@ -1,6 +1,6 @@
 import Loaders from "./loaders";
 import AnalyzerLoader from "./loaders/Analyzers.loader";
-import { ClientInterface, lexicTokens, LoaderInitConfig, LoaderResult } from "./utils/types";
+import { ClientInterface, lexicTokens, LoaderInitConfig, LoaderResult, Simbolo } from "./utils/types";
 
 export interface CompilerOptions {
     verbose?: boolean;
@@ -19,7 +19,7 @@ export default class Compiler implements ClientInterface {
   public analyzers: any[];
   public tokens: lexicTokens[];
   public ast: ClientInterface["ast"];
-
+  public tabelaSimbolos?: Simbolo[];
   public options: CompilerOptions;
 
     /**

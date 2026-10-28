@@ -11,10 +11,15 @@ const mockClient: ClientInterface = {
   Error() {},
 };
 
+// Função auxiliar para simplificar os testes e evitar repetição de 'linha' e 'coluna'
+function obterTokensLimpos(input: string) {
+  const analyzer = new LexAnalyzer(mockClient);
+  return analyzer.tokenize(input).map(t => ({ tipo: t.tipo, valor: t.valor }));
+}
+
 describe("LexAnalyzer", () => {
   test("tokenize: a = 1 + 2 produz a lista completa de tokens", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("a = 1 + 2");
+    const tokens = obterTokensLimpos("a = 1 + 2");
 
     expect(tokens).toEqual([
       { tipo: "IDENTIFICADOR", valor: "a" },
@@ -26,20 +31,17 @@ describe("LexAnalyzer", () => {
     ]);
   });
 
-  test("tokenize: caractere inválido lança TypeError", () => {
+  test("tokenize: caractere inválido lança TypeError indicando linha e coluna", () => {
     const analyzer = new LexAnalyzer(mockClient);
 
     expect(() => analyzer.tokenize("@")).toThrow(TypeError);
     expect(() => analyzer.tokenize("@")).toThrow(
-      'Caractere inesperado encontrado: "@" na posição 0'
+      'Caractere inesperado encontrado: "@" na linha 1, coluna 1'
     );
   });
 
   test("tokenize: reconhece todas as palavras-chave corretamente", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize(
-      "let const var function if else while for return"
-    );
+    const tokens = obterTokensLimpos("let const var function if else while for return");
 
     expect(tokens).toEqual([
       { tipo: "KEYWORD", valor: "LET" },
@@ -56,8 +58,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece identificadores, incluindo com underline e dígitos", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("x foo _bar baz123 _123abc");
+    const tokens = obterTokensLimpos("x foo _bar baz123 _123abc");
 
     expect(tokens).toEqual([
       { tipo: "IDENTIFICADOR", valor: "x" },
@@ -70,8 +71,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece números inteiros e decimais", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("42 3.14 0 007");
+    const tokens = obterTokensLimpos("42 3.14 0 007");
 
     expect(tokens).toEqual([
       { tipo: "NUMERO", valor: "42" },
@@ -83,22 +83,19 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece strings com aspas duplas e com aspas simples", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-
-    expect(analyzer.tokenize('"ola mundo"')).toEqual([
+    expect(obterTokensLimpos('"ola mundo"')).toEqual([
       { tipo: "STRING", valor: "ola mundo" },
       { tipo: "EOF", valor: "EOF" },
     ]);
 
-    expect(analyzer.tokenize("'ola'")).toEqual([
+    expect(obterTokensLimpos("'ola'")).toEqual([
       { tipo: "STRING", valor: "ola" },
       { tipo: "EOF", valor: "EOF" },
     ]);
   });
 
   test("tokenize: reconhece string vazia", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize('""');
+    const tokens = obterTokensLimpos('""');
 
     expect(tokens).toEqual([
       { tipo: "STRING", valor: "" },
@@ -107,8 +104,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece booleanos true e false", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("true false");
+    const tokens = obterTokensLimpos("true false");
 
     expect(tokens).toEqual([
       { tipo: "BOOLEAN", valor: "true" },
@@ -118,10 +114,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece operadores aritméticos, de atribuição, relacionais e lógicos", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize(
-      "+ - * / % = == != < > <= >= && ||"
-    );
+    const tokens = obterTokensLimpos("+ - * / % = == != < > <= >= && ||");
 
     expect(tokens).toEqual([
       { tipo: "OPERADOR", valor: "+" },
@@ -143,8 +136,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: normaliza o operador === para ==", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("a === b");
+    const tokens = obterTokensLimpos("a === b");
 
     expect(tokens).toEqual([
       { tipo: "IDENTIFICADOR", valor: "a" },
@@ -155,8 +147,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: reconhece delimitadores de escopo e pontuação", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("{ } ( ) ; , .");
+    const tokens = obterTokensLimpos("{ } ( ) ; , .");
 
     expect(tokens).toEqual([
       { tipo: "DELIMITADOR", valor: "{" },
@@ -171,8 +162,7 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: ignora espaços, tabulações e quebras de linha", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize("let\t x\n =  \n 5");
+    const tokens = obterTokensLimpos("let\t x\n =  \n 5");
 
     expect(tokens).toEqual([
       { tipo: "KEYWORD", valor: "LET" },
@@ -184,19 +174,12 @@ describe("LexAnalyzer", () => {
   });
 
   test("tokenize: entrada vazia ou só com espaços gera apenas o token EOF", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-
-    expect(analyzer.tokenize("")).toEqual([{ tipo: "EOF", valor: "EOF" }]);
-    expect(analyzer.tokenize("   \t\n  ")).toEqual([
-      { tipo: "EOF", valor: "EOF" },
-    ]);
+    expect(obterTokensLimpos("")).toEqual([{ tipo: "EOF", valor: "EOF" }]);
+    expect(obterTokensLimpos("   \t\n  ")).toEqual([{ tipo: "EOF", valor: "EOF" }]);
   });
 
   test("tokenize: um programa completo produz a sequência correta de tokens", () => {
-    const analyzer = new LexAnalyzer(mockClient);
-    const tokens = analyzer.tokenize(
-      "let x = 10; if (x > 5) { return true; }"
-    );
+    const tokens = obterTokensLimpos("let x = 10; if (x > 5) { return true; }");
 
     expect(tokens).toEqual([
       { tipo: "KEYWORD", valor: "LET" },
@@ -219,12 +202,12 @@ describe("LexAnalyzer", () => {
     ]);
   });
 
-  test("tokenize: caractere inválido no meio da entrada reporta a posição correta", () => {
+  test("tokenize: caractere inválido no meio da entrada reporta a linha e coluna corretas", () => {
     const analyzer = new LexAnalyzer(mockClient);
 
     expect(() => analyzer.tokenize("a = @ + 1")).toThrow(TypeError);
     expect(() => analyzer.tokenize("a = @ + 1")).toThrow(
-      'Caractere inesperado encontrado: "@" na posição 4'
+      'Caractere inesperado encontrado: "@" na linha 1, coluna 5'
     );
   });
 });
