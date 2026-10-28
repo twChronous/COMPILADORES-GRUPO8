@@ -61,8 +61,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
         corpo.push(stmt);
       }
     }
-    this.client.ast = corpo;
-    
+    this.client.ast = corpo;    
     if (this.erros.length > 0) {
       this.erros.forEach(err => this.client.LOG_ERR(err));
       return false;
