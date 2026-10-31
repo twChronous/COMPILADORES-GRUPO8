@@ -183,22 +183,72 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
   }
 
   /**
+   * Analisa encadeamentos de acessos a membros (ex: objeto.propriedade)
+   * e chamadas de função (ex: funcao(arg1, arg2)).
+   */
+  private parseMembroOuChamada(): NoExpressao {
+    // Primeiro pega a base (ex: "console")
+    let expressao = this.parseValue();
+
+    // Fica em loop para suportar encadeamentos como "objeto.metodo().outraProp"
+    while (true) {
+      if (this.ehToken('DELIMITADOR', '.')) {
+        this.consumir('DELIMITADOR', '.');
+        const propriedade = this.consumir('IDENTIFICADOR');
+        expressao = {
+          tipo: 'AcessoMembro',
+          objeto: expressao,
+          propriedade: propriedade.valor,
+          linha: propriedade.linha,
+          coluna: propriedade.coluna
+        };
+      } 
+      else if (this.ehToken('DELIMITADOR', '(')) {
+        const tkAbertura = this.consumir('DELIMITADOR', '(');
+        const argumentos: NoExpressao[] = [];
+        
+        // Verifica se há argumentos
+        if (!this.ehToken('DELIMITADOR', ')')) {
+          argumentos.push(this.parseExpression());
+          while (this.ehToken('DELIMITADOR', ',')) {
+            this.consumir('DELIMITADOR', ',');
+            argumentos.push(this.parseExpression());
+          }
+        }
+        
+        this.consumir('DELIMITADOR', ')');
+        expressao = {
+          tipo: 'ChamadaFuncao',
+          callee: expressao,
+          argumentos,
+          linha: tkAbertura.linha,
+          coluna: tkAbertura.coluna
+        };
+      } 
+      else {
+        break; // Não é acesso de membro nem função, sai do loop
+      }
+    }
+
+    return expressao;
+  }
+
+  /**
    * Analisa a precedência de multiplicação, divisão e módulo.
-   * 
    * @returns O nó com a operação matemática estruturada.
    */
   private parseFator(): NoExpressao {
-    let esquerda = this.parseValue();
+    let esquerda = this.parseMembroOuChamada(); 
     
     while (this.ehToken('OPERADOR', '*') || this.ehToken('OPERADOR', '/') || this.ehToken('OPERADOR', '%')) {
       const operador = this.consumir('OPERADOR');
-      const direita = this.parseValue();
+      const direita = this.parseMembroOuChamada();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
     
     return esquerda;
   }
-
+ 
   /**
    * Analisa a precedência de adição e subtração.
    * 

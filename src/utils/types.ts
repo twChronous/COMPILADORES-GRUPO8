@@ -50,7 +50,7 @@ export interface lexicTokens {
   coluna: number;
 }
 
-export type TipoSemantico = "number" | "string" | "boolean";
+export type TipoSemantico = "number" | "string" | "boolean" | "any" | "void";
 
 // Base para todos os nós da AST (Rastreabilidade)
 export interface BaseNode {
@@ -79,7 +79,12 @@ export interface NoExpressaoBinaria extends BaseNode {
   tipoInferido?: TipoSemantico;
 }
 
-export type NoExpressao = NoLiteral | NoIdentificador | NoExpressaoBinaria;
+export type NoExpressao = 
+  | NoLiteral 
+  | NoIdentificador 
+  | NoExpressaoBinaria 
+  | NoAcessoMembro 
+  | NoChamadaFuncao;
 
 export interface NoDeclaracaoVariavel extends BaseNode {
   tipo: "DeclaracaoVariavel";
@@ -107,3 +112,17 @@ export interface NoExpressaoStatement extends BaseNode {
 }
 
 export type NoStatement = NoDeclaracaoVariavel | NoDeclaracaoIf | NoExpressaoStatement;
+
+export interface NoAcessoMembro extends BaseNode {
+  tipo: "AcessoMembro";
+  objeto: NoExpressao;
+  propriedade: string;
+  tipoInferido?: TipoSemantico;
+}
+
+export interface NoChamadaFuncao extends BaseNode {
+  tipo: "ChamadaFuncao";
+  callee: NoExpressao;
+  argumentos: NoExpressao[];
+  tipoInferido?: TipoSemantico;
+}

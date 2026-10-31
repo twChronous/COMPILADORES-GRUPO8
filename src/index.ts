@@ -54,6 +54,7 @@ async function run() {
       if (x > 10) {
         x = x + 1;
       }
+      console.log("test")
     `;
   }
 

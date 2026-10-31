@@ -199,7 +199,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @param no O nó da expressão.
    * @returns O tipo de dado inferido para a expressão.
    */
-  private tipoDaExpressao(no: NoExpressao): TipoSemantico {
+private tipoDaExpressao(no: NoExpressao): TipoSemantico {
     if (no.tipo === "Literal") {
       if (no.tipoDado === "NUMERO") no.tipoInferido = "number";
       else if (no.tipoDado === "STRING") no.tipoInferido = "string";
@@ -209,6 +209,20 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
 
     if (no.tipo === "Identificador") {
       no.tipoInferido = this.buscar(no.nome, no.linha).tipo;
+      return no.tipoInferido;
+    }
+
+    if (no.tipo === "AcessoMembro") {
+      // Como não temos um mapeamento completo de objetos nativos,
+      // assumimos "any" para evitar erros que bloqueiem a compilação.
+      no.tipoInferido = "any";
+      return no.tipoInferido;
+    }
+
+    if (no.tipo === "ChamadaFuncao") {
+      // Verifica semântica de cada argumento passado na função
+      no.argumentos.forEach(arg => this.tipoDaExpressao(arg));
+      no.tipoInferido = "any"; 
       return no.tipoInferido;
     }
 
