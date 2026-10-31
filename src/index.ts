@@ -53,11 +53,17 @@ async function run() {
       console.log("\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback).");
     }
     input = `
-      let x = 10 + 20; 
+      let x = 10 + 20;
+
       if (x > 10) {
         x = x + 1;
       }
       console.log("test")
+
+      function soma(a,b) {
+        return a + b;
+      }
+      x = soma(1,2)
     `;
   }
 

@@ -140,8 +140,27 @@ export interface NoExpressaoStatement extends BaseNode {
   tipo: "ExpressaoStatement";
   expressao: NoExpressao;
 }
+export interface NoParametro extends BaseNode {
+  tipo: "Parametro";
+  nome: string;
+}
 
-export type NoStatement =
-  | NoDeclaracaoVariavel
-  | NoDeclaracaoIf
-  | NoExpressaoStatement;
+export interface NoDeclaracaoFuncao extends BaseNode {
+  tipo: "DeclaracaoFuncao";
+  nome: string;
+  parametros: NoParametro[];
+  corpo: NoBloco;
+}
+
+export interface NoReturnStatement extends BaseNode {
+  tipo: "ReturnStatement";
+  argumento: NoExpressao | null;
+}
+
+export type NoStatement = 
+  | NoDeclaracaoVariavel 
+  | NoDeclaracaoIf 
+  | NoExpressaoStatement 
+  | NoBloco
+  | NoDeclaracaoFuncao 
+  | NoReturnStatement;

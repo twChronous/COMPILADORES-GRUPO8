@@ -1,5 +1,5 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf } from "../utils/types";
+import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro } from "../utils/types";
 
 /**
  * Representa um erro encontrado durante a análise sintática.
@@ -31,7 +31,9 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     LET: () => this.parseDeclaration(),
     CONST: () => this.parseDeclaration(),
     VAR: () => this.parseDeclaration(),
-    IF: () => this.parseIf()
+    IF: () => this.parseIf(),
+    FUNCTION: () => this.parseFunctionDeclaration(), // NOVA
+    RETURN: () => this.parseReturn()
   };
 
   /**
@@ -409,5 +411,63 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       }
       throw e;
     }
+  }
+  /**
+   * Analisa a declaração de uma função e seus parâmetros.
+   */
+  private parseFunctionDeclaration(): NoDeclaracaoFuncao {
+    const tkKeyword = this.consumir('KEYWORD', 'FUNCTION');
+    const tkNome = this.consumir('IDENTIFICADOR');
+    
+    this.consumir('DELIMITADOR', '(');
+    const parametros: NoParametro[] = [];
+    
+    // Processa os parâmetros separados por vírgula
+    if (!this.ehToken('DELIMITADOR', ')')) {
+      const param = this.consumir('IDENTIFICADOR');
+      parametros.push({ tipo: "Parametro", nome: param.valor, linha: param.linha, coluna: param.coluna });
+      
+      while (this.ehToken('DELIMITADOR', ',')) {
+        this.consumir('DELIMITADOR', ',');
+        const proxParam = this.consumir('IDENTIFICADOR');
+        parametros.push({ tipo: "Parametro", nome: proxParam.valor, linha: proxParam.linha, coluna: proxParam.coluna });
+      }
+    }
+    
+    this.consumir('DELIMITADOR', ')');
+    
+    // O corpo da função é apenas um bloco comum
+    const corpo = this.parseBloco();
+
+    return {
+      tipo: 'DeclaracaoFuncao',
+      nome: tkNome.valor,
+      parametros,
+      corpo,
+      linha: tkKeyword.linha,
+      coluna: tkKeyword.coluna
+    };
+  }
+
+  /**
+   * Analisa a instrução de retorno (podendo ser vazia).
+   */
+  private parseReturn(): NoReturnStatement {
+    const tk = this.consumir('KEYWORD', 'RETURN');
+    let argumento: NoExpressao | null = null;
+    
+    // Se não houver ; ou } imediatamente, significa que há um valor sendo retornado
+    if (!this.ehToken('DELIMITADOR', ';') && !this.ehToken('DELIMITADOR', '}')) {
+      argumento = this.parseExpression();
+    }
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'ReturnStatement',
+      argumento,
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
   }
 }

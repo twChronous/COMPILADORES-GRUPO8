@@ -9,7 +9,9 @@ import {
   NoExpressaoStatement,
   NoStatement,
   TipoSemantico,
-  Simbolo
+  Simbolo,
+  NoReturnStatement,
+  NoDeclaracaoFuncao
 } from "../utils/types";
 
 
@@ -31,6 +33,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
   private escopos: Map<string, Simbolo>[] = [];
   private registroSimbolos: Simbolo[] = [];
   private contadorEscopo = 0;
+  private nivelFuncao = 0;
 
   /**
    * Inicializa o analisador semântico.
@@ -118,13 +121,15 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @returns O nó analisado e tipado.
    * @throws Lança um erro se o tipo do comando não for suportado.
    */
-  private verificarStatement(no: NoStatement): NoStatement {
-    if (no.tipo === "DeclaracaoVariavel") return this.verificarDeclaracao(no);
-    if (no.tipo === "DeclaracaoIf") return this.verificarIf(no);
-    if (no.tipo === "ExpressaoStatement") return this.verificarExpressaoStatement(no);
+  private verificarStatement(statement: NoStatement): NoStatement {
+    if (statement.tipo === "DeclaracaoVariavel") this.verificarDeclaracao(statement);
+    else if (statement.tipo === "DeclaracaoIf") this.verificarIf(statement);
+    else if (statement.tipo === "Bloco") this.verificarBloco(statement);
+    else if (statement.tipo === "ExpressaoStatement") this.verificarExpressaoStatement(statement);
+    else if (statement.tipo === "DeclaracaoFuncao") this.verificarDeclaracaoFuncao(statement); // NOVA
+    else if (statement.tipo === "ReturnStatement") this.verificarReturn(statement);
     
-    const noDesconhecido = no as any;
-    throw new Error(`Erro Semântico [Linha ${noDesconhecido.linha || '?'}]: statement '${noDesconhecido.tipo}' não suportado.`);
+    return statement;
   }
 
   /**
@@ -183,6 +188,41 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
   private verificarExpressaoStatement(no: NoExpressaoStatement): NoExpressaoStatement {
     this.tipoDaExpressao(no.expressao);
     return no;
+  }
+
+  private verificarDeclaracaoFuncao(no: NoDeclaracaoFuncao): void {
+    this.declarar(no.nome, "const", "function", no.linha);
+
+    this.contadorEscopo++;
+    this.escopos.push(new Map());
+    
+    no.parametros.forEach(param => {
+      // Usamos "any" por enquanto, já que JS nativo não possui tipagem de argumentos
+      this.declarar(param.nome, "let", "any", param.linha); 
+    });
+
+    this.nivelFuncao++;
+    for (const stmt of no.corpo.corpo) {
+      this.verificarStatement(stmt);
+    }
+    this.nivelFuncao--;
+
+    this.escopos.pop();
+  }
+
+  /**
+   * Garante que o retorno é válido e só ocorre dentro de funções.
+   */
+  private verificarReturn(no: NoReturnStatement): void {
+    if (this.nivelFuncao === 0) {
+      throw new Error(`Erro Semântico [Linha ${no.linha}]: 'return' só pode ser usado dentro do corpo de uma função.`);
+    }
+
+    if (no.argumento) {
+      // Apenas aciona a validação da expressão para garantir 
+      // que nenhuma variável não declarada está sendo retornada
+      this.tipoDaExpressao(no.argumento);
+    }
   }
 
   /**
@@ -266,30 +306,43 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     return this.tipoBinario(no);
   }
 
-  /**
+ /**
    * Infere o tipo de dado de uma operação binária.
    * 
    * @param no O nó da expressão binária.
    * @returns O tipo de dado inferido para a operação.
    */
   private tipoBinario(no: NoExpressaoBinaria): TipoSemantico {
+    // Trata atribuições (ex: x = 1, x += 2)
     if (OPERADORES_ATRIBUICAO.has(no.operador)) {
       no.tipoInferido = this.tipoAtribuicao(no);
       return no.tipoInferido;
     }
+    
+    // Descobre os tipos da esquerda e da direita
     const esquerda = this.tipoDaExpressao(no.esquerda);
     const direita = this.tipoDaExpressao(no.direita);
+    
+    // Se qualquer lado for "any" (parâmetros de função ou retornos nativos), 
+    // bypassamos a regra estrita e assumimos o resultado como "any".
+    if (esquerda === "any" || direita === "any") {
+      no.tipoInferido = "any";
+      return no.tipoInferido;
+    }
+    
+    // Se forem tipos primitivos (number, string, boolean), segue o fluxo normal
     no.tipoInferido = this.tipoOperacao(no.operador, esquerda, direita, no.linha);
     return no.tipoInferido;
   }
 
-  /**
+ /**
    * Verifica a validade e infere o tipo de uma operação de atribuição.
-   * O método impede a reatribuição de constantes e assegura a compatibilidade de tipos.
+   * O método impede a reatribuição de constantes e assegura a compatibilidade de tipos,
+   * flexibilizando quando lida com tipos dinâmicos ('any').
    * 
    * @param no O nó de expressão de atribuição.
    * @returns O tipo de dado resultante da atribuição.
-   * @throws Lança um erro se o alvo não for um identificador, se tentar reatribuir uma constante ou se os tipos forem incompatíveis.
+   * @throws Lança um erro se o alvo não for um identificador, reatribuir const, ou tipos incompatíveis.
    */
   private tipoAtribuicao(no: NoExpressaoBinaria): TipoSemantico {
     if (no.esquerda.tipo !== "Identificador") {
@@ -305,16 +358,23 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     const direita = this.tipoDaExpressao(no.direita);
 
     if (no.operador === "=") {
-      if (direita !== simbolo.tipo) {
+      // Aceita a atribuição se os tipos baterem, OU se um dos lados for 'any'
+      if (direita !== simbolo.tipo && direita !== "any" && simbolo.tipo !== "any") {
         throw new Error(`Erro Semântico [Linha ${no.linha}]: Atribuição incompatível para '${simbolo.nome}'. Esperado '${simbolo.tipo}', encontrado '${direita}'.`);
       }
       return simbolo.tipo;
     }
 
-    if (simbolo.tipo !== "number" || direita !== "number") {
+    // Para operadores compostos (+=, -=, etc)
+    const ehNumero = simbolo.tipo === "number" && direita === "number";
+    const temAny = simbolo.tipo === "any" || direita === "any";
+
+    // Bloqueia apenas se não for matemática de números E nenhum lado for 'any'
+    if (!ehNumero && !temAny) {
       throw new Error(`Erro Semântico [Linha ${no.linha}]: O operador '${no.operador}' não suporta os tipos '${simbolo.tipo}' e '${direita}'.`);
     }
-    return "number";
+    
+    return simbolo.tipo;
   }
 
   /**
