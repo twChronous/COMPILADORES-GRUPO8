@@ -58,9 +58,13 @@ Verifica regras de contexto que a gramática não consegue validar sozinha.
 
 ### Representação Intermediária (IR) e Otimização
 
+|-------------EM CONSTRUÇÃO--------------------|
+
 A representação intermediária (IR) descreve as operações do programa de forma independente da sintaxe do JavaScript ou do Go. O otimizador utiliza esta IR para remover operações desnecessárias e otimizar o código final.
 
 ### Gerador de Código
+
+|-------------EM CONSTRUÇÃO--------------------|
 
 Converte a representação intermediária (ou a AST validada) em código-fonte Go. O código gerado respeita a sintaxe e as restrições estáticas da linguagem Go, mas preserva a lógica comportamental do programa JavaScript original.
 
@@ -184,3 +188,10 @@ export interface ClientInterface {
 * **Armazenamento de Progresso:** As propriedades `tokens`, `ast` e `tabelaSimbolos` atuam como pontos de passagem. O Analisador Léxico preenche os tokens; o Sintático consome os tokens e gera a AST; e o Semântico consome a AST para gerar a Tabela de Símbolos.
 * **Orquestração de Falhas:** A lista `errosSintaticos` acumula as falhas recuperadas pelo *Panic Mode*. O sistema só interrompe a execução e exibe o relatório de erros após a conclusão da etapa.
 * **Monitoramento Padronizado:** Os métodos de `LOG` centralizam a saída no terminal. A classe orquestradora decide se exibe ou oculta essas mensagens com base nas *flags* acionadas pelo usuário no momento da execução (ex: `--verbose`).
+
+
+## 📚 Outros Documentos
+
+- [Especificação da Linguagem e Escopo](Escopo.md)
+- [Estrutura de Testes](Testes.md)
+- [Documentação de Código](compiler/)
