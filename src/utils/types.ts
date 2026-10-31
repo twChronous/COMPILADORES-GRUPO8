@@ -66,6 +66,8 @@ export type TipoSemantico =
   | "any"
   | "void"
   | "object"
+  | "undefined"
+  | "null"
   | "function";
 
 // Base para todos os nós da AST (Rastreabilidade).
@@ -76,7 +78,7 @@ export interface BaseNode {
 
 export interface NoLiteral extends BaseNode {
   tipo: "Literal";
-  tipoDado: "NUMERO" | "STRING" | "BOOLEAN";
+  tipoDado: "NUMERO" | "STRING" | "BOOLEAN" | "NULL" | "UNDEFINED";
   valor: string;
   tipoInferido?: TipoSemantico;
 }
@@ -152,9 +154,21 @@ export interface NoDeclaracaoFuncao extends BaseNode {
   corpo: NoBloco;
 }
 
+export interface NoDeclaracaoWhile extends BaseNode {
+  tipo: "DeclaracaoWhile";
+  condicao: NoExpressao;
+  corpo: NoBloco;
+}
+
 export interface NoReturnStatement extends BaseNode {
   tipo: "ReturnStatement";
   argumento: NoExpressao | null;
+}
+export interface NoBreakStatement extends BaseNode {
+  tipo: "BreakStatement";
+}
+export interface NoContinueStatement extends BaseNode {
+  tipo: "ContinueStatement";
 }
 
 export type NoStatement = 
@@ -163,4 +177,7 @@ export type NoStatement =
   | NoExpressaoStatement 
   | NoBloco
   | NoDeclaracaoFuncao 
-  | NoReturnStatement;
+  | NoReturnStatement
+  | NoBreakStatement
+  | NoContinueStatement
+  | NoDeclaracaoWhile;

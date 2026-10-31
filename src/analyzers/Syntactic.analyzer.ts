@@ -1,5 +1,5 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro } from "../utils/types";
+import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro, NoContinueStatement, NoBreakStatement, NoDeclaracaoWhile } from "../utils/types";
 
 /**
  * Representa um erro encontrado durante a análise sintática.
@@ -33,7 +33,10 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     VAR: () => this.parseDeclaration(),
     IF: () => this.parseIf(),
     FUNCTION: () => this.parseFunctionDeclaration(), // NOVA
-    RETURN: () => this.parseReturn()
+    RETURN: () => this.parseReturn(),
+    BREAK: () => this.parseBreak(),
+    CONTINUE: () => this.parseContinue(),
+    WHILE: () => this.parseWhile(),
   };
 
   /**
@@ -173,12 +176,22 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       this.atual++;
       return { ...coordenadas, tipo: 'Identificador', nome: token.valor };
     }
-    
+
     if (this.ehToken('DELIMITADOR', '(')) {
       this.consumir('DELIMITADOR', '(');
       const expr = this.parseExpression();
       this.consumir('DELIMITADOR', ')');
       return expr;
+    }
+
+if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDEFINED')) {
+      this.consumir('KEYWORD', token.valor);
+      return { 
+        ...coordenadas, 
+        tipo: 'Literal', 
+        tipoDado: token.valor as "NULL" | "UNDEFINED", // Usa o valor e não o tipo
+        valor: token.valor.toLowerCase() // "null" ou "undefined" minúsculos 
+      };
     }
 
     throw this.erro(token, `Expressão inválida: token inesperado '${token.valor}'`);
@@ -468,6 +481,54 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       argumento,
       linha: tk.linha,
       coluna: tk.coluna
+    };
+  }
+    /**
+   * Analisa a instrução de salto de iteração (continue).
+   */
+  private parseContinue(): NoContinueStatement {
+    const tk = this.consumir('KEYWORD', 'CONTINUE');
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'ContinueStatement',
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
+  }
+  /**
+   * Analisa a instrução de interrupção de laço (break).
+   */
+  private parseBreak(): NoBreakStatement {
+    const tk = this.consumir('KEYWORD', 'BREAK');
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'BreakStatement',
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
+  }
+  /**
+   * Analisa um laço de repetição (while).
+   */
+  private parseWhile(): NoDeclaracaoWhile {
+    const tkKeyword = this.consumir('KEYWORD', 'WHILE');
+    
+    this.consumir('DELIMITADOR', '(');
+    const condicao = this.parseExpression();
+    this.consumir('DELIMITADOR', ')');
+    
+    const corpo = this.parseBloco();
+
+    return {
+      tipo: 'DeclaracaoWhile',
+      condicao,
+      corpo,
+      linha: tkKeyword.linha,
+      coluna: tkKeyword.coluna
     };
   }
 }

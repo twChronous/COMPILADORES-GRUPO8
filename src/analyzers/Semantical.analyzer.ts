@@ -11,7 +11,9 @@ import {
   TipoSemantico,
   Simbolo,
   NoReturnStatement,
-  NoDeclaracaoFuncao
+  NoDeclaracaoFuncao,
+  NoBreakStatement,
+  NoContinueStatement
 } from "../utils/types";
 
 
@@ -34,6 +36,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
   private registroSimbolos: Simbolo[] = [];
   private contadorEscopo = 0;
   private nivelFuncao = 0;
+  private nivelLoop = 0;
 
   /**
    * Inicializa o analisador semântico.
@@ -126,9 +129,10 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     else if (statement.tipo === "DeclaracaoIf") this.verificarIf(statement);
     else if (statement.tipo === "Bloco") this.verificarBloco(statement);
     else if (statement.tipo === "ExpressaoStatement") this.verificarExpressaoStatement(statement);
-    else if (statement.tipo === "DeclaracaoFuncao") this.verificarDeclaracaoFuncao(statement); // NOVA
+    else if (statement.tipo === "DeclaracaoFuncao") this.verificarDeclaracaoFuncao(statement);
     else if (statement.tipo === "ReturnStatement") this.verificarReturn(statement);
-    
+    else if (statement.tipo === "BreakStatement") this.verificarBreak(statement);       
+    else if (statement.tipo === "ContinueStatement") this.verificarContinue(statement); 
     return statement;
   }
 
@@ -189,7 +193,23 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     this.tipoDaExpressao(no.expressao);
     return no;
   }
+  /**
+     * Garante que o 'break' só ocorre dentro de um laço de repetição.
+     */
+    private verificarBreak(no: NoBreakStatement): void {
+      if (this.nivelLoop === 0) {
+        throw new Error(`Erro Semântico [Linha ${no.linha}]: 'break' só pode ser usado dentro de um laço de repetição (while ou for).`);
+      }
+    }
 
+    /**
+     * Garante que o 'continue' só ocorre dentro de um laço de repetição.
+     */
+    private verificarContinue(no: NoContinueStatement): void {
+      if (this.nivelLoop === 0) {
+        throw new Error(`Erro Semântico [Linha ${no.linha}]: 'continue' só pode ser usado dentro de um laço de repetição (while ou for).`);
+      }
+    }
   private verificarDeclaracaoFuncao(no: NoDeclaracaoFuncao): void {
     this.declarar(no.nome, "const", "function", no.linha);
 
@@ -225,6 +245,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     }
   }
 
+ 
   /**
    * Registra uma nova variável na tabela de símbolos do escopo atual.
    * 
@@ -273,6 +294,8 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     if (no.tipo === "Literal") {
       if (no.tipoDado === "NUMERO") no.tipoInferido = "number";
       else if (no.tipoDado === "STRING") no.tipoInferido = "string";
+      else if (no.tipoDado === "NULL") no.tipoInferido = "null";  
+      else if (no.tipoDado === "UNDEFINED") no.tipoInferido = "undefined"; 
       else no.tipoInferido = "boolean";
       return no.tipoInferido;
     }

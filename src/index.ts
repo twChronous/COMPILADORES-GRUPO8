@@ -64,6 +64,12 @@ async function run() {
         return a + b;
       }
       x = soma(1,2)
+      let j = null
+      let y = null
+
+      while(j != y) { 
+        break; 
+      }
     `;
   }
 

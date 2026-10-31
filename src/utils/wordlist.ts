@@ -4,9 +4,9 @@ export const Palavras_Reservadas = {
   BOOLEAN: 'BOOLEAN',
   IDENTIFICADOR: 'IDENTIFICADOR',
   KEYWORD: 'KEYWORD',
-  OPERADOR: 'OPERADOR', // aritméticos, atribuição, relacionais e lógicos
-  DELIMITADOR: 'DELIMITADOR', // delimitadores de escopo []
-  EOF: 'EOF'              // Fim do arquivo (End of File)
+  OPERADOR: 'OPERADOR', 
+  DELIMITADOR: 'DELIMITADOR', 
+  EOF: 'EOF'              
 };
 
 export const PALAVRAS_CHAVE: Record<string, string> = {
@@ -20,5 +20,10 @@ export const PALAVRAS_CHAVE: Record<string, string> = {
   'for': 'FOR',
   'return': 'RETURN',
   'true': 'TRUE',
-  'false': 'FALSE'
+  'false': 'FALSE',
+  
+  'break': 'BREAK',
+  'continue': 'CONTINUE',
+  'null': 'NULL',
+  'undefined': 'UNDEFINED'
 };
