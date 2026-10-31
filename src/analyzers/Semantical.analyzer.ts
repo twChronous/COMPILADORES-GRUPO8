@@ -75,12 +75,42 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @returns A lista de comandos anotados com seus tipos inferidos.
    */
   public analisar(corpo: NoStatement[]): NoStatement[] {
-    this.escopos = [new Map()]; // Inicializa o escopo global
-    this.registroSimbolos = [];
+    const escopoGlobal = new Map<string, Simbolo>();
+    this.preencherEscopoNativo(escopoGlobal); // <-- PRÉ-POPULA O ESCOPO AQUI
+    
+    this.escopos = [escopoGlobal];
+    this.registroSimbolos = Array.from(escopoGlobal.values()); // Adiciona os nativos ao registro final
     this.contadorEscopo = 0;
+    
     return corpo.map((statement) => this.verificarStatement(statement));
   }
 
+  /**
+   * Pré-popula o escopo global com os objetos e funções nativas do JavaScript.
+   */
+  private preencherEscopoNativo(escopo: Map<string, Simbolo>): void {
+    const nativos = [
+      { nome: "console", tipo: "object" },
+      { nome: "Math", tipo: "object" },
+      { nome: "Date", tipo: "function" },
+      { nome: "String", tipo: "function" },
+      { nome: "Number", tipo: "function" },
+      { nome: "Boolean", tipo: "function" },
+      { nome: "parseInt", tipo: "function" },
+      { nome: "parseFloat", tipo: "function" },
+      { nome: "isNaN", tipo: "function" }
+    ];
+
+    nativos.forEach(nativo => {
+      escopo.set(nativo.nome, {
+        nome: nativo.nome,
+        modificador: "const", // Nativos não devem ser reatribuídos
+        tipo: nativo.tipo as TipoSemantico,
+        linhaDeclaracao: 0,   // 0 indica que é nativo (built-in)
+        escopo: "Global (Nativo)"
+      });
+    });
+  }
   /**
    * Verifica um único comando e o direciona para a função de validação correta.
    * 
@@ -199,7 +229,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @param no O nó da expressão.
    * @returns O tipo de dado inferido para a expressão.
    */
-private tipoDaExpressao(no: NoExpressao): TipoSemantico {
+  private tipoDaExpressao(no: NoExpressao): TipoSemantico {
     if (no.tipo === "Literal") {
       if (no.tipoDado === "NUMERO") no.tipoInferido = "number";
       else if (no.tipoDado === "STRING") no.tipoInferido = "string";
@@ -213,15 +243,22 @@ private tipoDaExpressao(no: NoExpressao): TipoSemantico {
     }
 
     if (no.tipo === "AcessoMembro") {
-      // Como não temos um mapeamento completo de objetos nativos,
-      // assumimos "any" para evitar erros que bloqueiem a compilação.
+      // 1. Valida se o objeto base (ex: 'console') existe na tabela de símbolos
+      this.tipoDaExpressao(no.objeto); 
+      
+      // 2. Como não mapeamos as propriedades internas de cada objeto nativo 
+      // (ex: saber que Math.PI é number e console.log é void), retornamos 'any'
       no.tipoInferido = "any";
       return no.tipoInferido;
     }
 
     if (no.tipo === "ChamadaFuncao") {
-      // Verifica semântica de cada argumento passado na função
+      // 1. Valida se a função ou método chamado existe
+      this.tipoDaExpressao(no.callee); 
+      
+      // 2. Valida cada argumento passado para a função
       no.argumentos.forEach(arg => this.tipoDaExpressao(arg));
+      
       no.tipoInferido = "any"; 
       return no.tipoInferido;
     }

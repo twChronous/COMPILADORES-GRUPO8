@@ -75,8 +75,11 @@ async function run() {
     console.log(JSON.stringify(compiler.tokens, null, 2));
   }
   if (showTS && compiler.tabelaSimbolos) {
+    const tabela_filtrada = compiler.tabelaSimbolos.filter(
+        (simbolo) => simbolo.linhaDeclaracao > 0
+      );
     console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
-    console.log(JSON.stringify(compiler.tabelaSimbolos, null, 2));
+    console.log(JSON.stringify(tabela_filtrada, null, 2));
   }
   // Define um código de saída apropriado para ferramentas de CI/CD
   if (!sucesso) {
