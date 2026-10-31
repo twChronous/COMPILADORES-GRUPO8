@@ -9,6 +9,7 @@ const help = args.includes("--help") || args.includes("-h");
 const verbose = args.includes("--verbose");
 const showAst = args.includes("--ast");
 const showTokens = args.includes("--tokens");
+const showTS = args.includes("--ts");
 
 // O arquivo fonte será o primeiro argumento que não começa com um traço "--"
 const arquivoFonte = args.find(arg => !arg.startsWith("--"));
@@ -23,11 +24,13 @@ Opções:
   --verbose      Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
   --ast          Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
   --tokens       Imprime a entrada em tokens final no terminal.
+  --ts           Imprime a tabela de simbolos no terminal.
 
 Exemplos de uso:
   run src/index.ts teste.js
   run src/index.ts teste.js --verbose
   run src/index.ts teste.js --tokens
+  run src/index.ts teste.js --ts
   run src/index.ts teste.js --ast --verbose
   run src/index.ts teste.js --tokens --ast --verbose
   `);
@@ -70,6 +73,10 @@ async function run() {
   if (showTokens && compiler.tokens) {
     console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
     console.log(JSON.stringify(compiler.tokens, null, 2));
+  }
+  if (showTS && compiler.tabelaSimbolos) {
+    console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
+    console.log(JSON.stringify(compiler.tabelaSimbolos, null, 2));
   }
   // Define um código de saída apropriado para ferramentas de CI/CD
   if (!sucesso) {
