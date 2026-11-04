@@ -3,7 +3,7 @@ export interface ClientInterface {
   analyzers: AnalyzerModelOptions[];
   ast?: NoStatement[];
   tabelaSimbolos?: Simbolo[];
-  errosSintaticos?: string[]; 
+  errosSintaticos?: string[];
   LOG(...args: string[]): void;
   LOG_ERR(...args: string[]): void;
   LOG_WARN(...args: string[]): void;
@@ -17,6 +17,7 @@ export interface Simbolo {
   linhaDeclaracao: number;
   escopo: string;
 }
+
 export interface LoaderResult {
   name: string;
   success: boolean;
@@ -40,7 +41,15 @@ export interface argsProps {
   input: String;
 }
 
-export type TokensType = "KEYWORD" | "IDENTIFICADOR" | "NUMERO" | "OPERADOR" | "EOF" | "BOOLEAN" | "STRING" | "DELIMITADOR";
+export type TokensType =
+  | "KEYWORD"
+  | "IDENTIFICADOR"
+  | "NUMERO"
+  | "OPERADOR"
+  | "EOF"
+  | "BOOLEAN"
+  | "STRING"
+  | "DELIMITADOR";
 
 export interface lexicTokens {
   tipo: TokensType;
@@ -50,9 +59,18 @@ export interface lexicTokens {
   coluna: number;
 }
 
-export type TipoSemantico = "number" | "string" | "boolean";
+export type TipoSemantico =
+  | "number"
+  | "string"
+  | "boolean"
+  | "any"
+  | "void"
+  | "object"
+  | "undefined"
+  | "null"
+  | "function";
 
-// Base para todos os nós da AST (Rastreabilidade)
+// Base para todos os nós da AST (Rastreabilidade).
 export interface BaseNode {
   linha: number;
   coluna: number;
@@ -60,7 +78,7 @@ export interface BaseNode {
 
 export interface NoLiteral extends BaseNode {
   tipo: "Literal";
-  tipoDado: "NUMERO" | "STRING" | "BOOLEAN";
+  tipoDado: "NUMERO" | "STRING" | "BOOLEAN" | "NULL" | "UNDEFINED";
   valor: string;
   tipoInferido?: TipoSemantico;
 }
@@ -78,8 +96,6 @@ export interface NoExpressaoBinaria extends BaseNode {
   direita: NoExpressao;
   tipoInferido?: TipoSemantico;
 }
-
-export type NoExpressao = NoLiteral | NoIdentificador | NoExpressaoBinaria;
 
 export interface NoDeclaracaoVariavel extends BaseNode {
   tipo: "DeclaracaoVariavel";
@@ -101,9 +117,67 @@ export interface NoDeclaracaoIf extends BaseNode {
   alternativa: NoBloco | null;
 }
 
+export interface NoAcessoMembro extends BaseNode {
+  tipo: "AcessoMembro";
+  objeto: NoExpressao;
+  propriedade: string;
+  tipoInferido?: TipoSemantico;
+}
+
+export interface NoChamadaFuncao extends BaseNode {
+  tipo: "ChamadaFuncao";
+  callee: NoExpressao;
+  argumentos: NoExpressao[];
+  tipoInferido?: TipoSemantico;
+}
+
+export type NoExpressao =
+  | NoLiteral
+  | NoIdentificador
+  | NoExpressaoBinaria
+  | NoAcessoMembro
+  | NoChamadaFuncao;
+
 export interface NoExpressaoStatement extends BaseNode {
   tipo: "ExpressaoStatement";
   expressao: NoExpressao;
 }
+export interface NoParametro extends BaseNode {
+  tipo: "Parametro";
+  nome: string;
+}
 
-export type NoStatement = NoDeclaracaoVariavel | NoDeclaracaoIf | NoExpressaoStatement;
+export interface NoDeclaracaoFuncao extends BaseNode {
+  tipo: "DeclaracaoFuncao";
+  nome: string;
+  parametros: NoParametro[];
+  corpo: NoBloco;
+}
+
+export interface NoDeclaracaoWhile extends BaseNode {
+  tipo: "DeclaracaoWhile";
+  condicao: NoExpressao;
+  corpo: NoBloco;
+}
+
+export interface NoReturnStatement extends BaseNode {
+  tipo: "ReturnStatement";
+  argumento: NoExpressao | null;
+}
+export interface NoBreakStatement extends BaseNode {
+  tipo: "BreakStatement";
+}
+export interface NoContinueStatement extends BaseNode {
+  tipo: "ContinueStatement";
+}
+
+export type NoStatement = 
+  | NoDeclaracaoVariavel 
+  | NoDeclaracaoIf 
+  | NoExpressaoStatement 
+  | NoBloco
+  | NoDeclaracaoFuncao 
+  | NoReturnStatement
+  | NoBreakStatement
+  | NoContinueStatement
+  | NoDeclaracaoWhile;

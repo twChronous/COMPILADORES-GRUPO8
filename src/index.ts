@@ -9,6 +9,7 @@ const help = args.includes("--help") || args.includes("-h");
 const verbose = args.includes("--verbose");
 const showAst = args.includes("--ast");
 const showTokens = args.includes("--tokens");
+const showTS = args.includes("--ts");
 
 // O arquivo fonte será o primeiro argumento que não começa com um traço "--"
 const arquivoFonte = args.find(arg => !arg.startsWith("--"));
@@ -23,11 +24,13 @@ Opções:
   --verbose      Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
   --ast          Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
   --tokens       Imprime a entrada em tokens final no terminal.
+  --ts           Imprime a tabela de simbolos no terminal.
 
 Exemplos de uso:
   run src/index.ts teste.js
   run src/index.ts teste.js --verbose
   run src/index.ts teste.js --tokens
+  run src/index.ts teste.js --ts
   run src/index.ts teste.js --ast --verbose
   run src/index.ts teste.js --tokens --ast --verbose
   `);
@@ -50,9 +53,22 @@ async function run() {
       console.log("\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback).");
     }
     input = `
-      let x = 10 + 20; 
+      let x = 10 + 20;
+
       if (x > 10) {
         x = x + 1;
+      }
+      console.log("test")
+
+      function soma(a,b) {
+        return a + b;
+      }
+      x = soma(1,2)
+      let j = null
+      let y = null
+
+      while(j != y) { 
+        break; 
       }
     `;
   }
@@ -69,6 +85,13 @@ async function run() {
   if (showTokens && compiler.tokens) {
     console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
     console.log(JSON.stringify(compiler.tokens, null, 2));
+  }
+  if (showTS && compiler.tabelaSimbolos) {
+    const tabela_filtrada = compiler.tabelaSimbolos.filter(
+        (simbolo) => simbolo.linhaDeclaracao > 0
+      );
+    console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
+    console.log(JSON.stringify(tabela_filtrada, null, 2));
   }
   // Define um código de saída apropriado para ferramentas de CI/CD
   if (!sucesso) {

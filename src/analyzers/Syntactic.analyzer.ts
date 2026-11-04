@@ -1,5 +1,5 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf } from "../utils/types";
+import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro, NoContinueStatement, NoBreakStatement, NoDeclaracaoWhile } from "../utils/types";
 
 /**
  * Representa um erro encontrado durante a análise sintática.
@@ -31,7 +31,12 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     LET: () => this.parseDeclaration(),
     CONST: () => this.parseDeclaration(),
     VAR: () => this.parseDeclaration(),
-    IF: () => this.parseIf()
+    IF: () => this.parseIf(),
+    FUNCTION: () => this.parseFunctionDeclaration(), // NOVA
+    RETURN: () => this.parseReturn(),
+    BREAK: () => this.parseBreak(),
+    CONTINUE: () => this.parseContinue(),
+    WHILE: () => this.parseWhile(),
   };
 
   /**
@@ -171,7 +176,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       this.atual++;
       return { ...coordenadas, tipo: 'Identificador', nome: token.valor };
     }
-    
+
     if (this.ehToken('DELIMITADOR', '(')) {
       this.consumir('DELIMITADOR', '(');
       const expr = this.parseExpression();
@@ -179,26 +184,86 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       return expr;
     }
 
+if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDEFINED')) {
+      this.consumir('KEYWORD', token.valor);
+      return { 
+        ...coordenadas, 
+        tipo: 'Literal', 
+        tipoDado: token.valor as "NULL" | "UNDEFINED", // Usa o valor e não o tipo
+        valor: token.valor.toLowerCase() // "null" ou "undefined" minúsculos 
+      };
+    }
+
     throw this.erro(token, `Expressão inválida: token inesperado '${token.valor}'`);
   }
 
   /**
+   * Analisa encadeamentos de acessos a membros (ex: objeto.propriedade)
+   * e chamadas de função (ex: funcao(arg1, arg2)).
+   */
+  private parseMembroOuChamada(): NoExpressao {
+    // Primeiro pega a base (ex: "console")
+    let expressao = this.parseValue();
+
+    // Fica em loop para suportar encadeamentos como "objeto.metodo().outraProp"
+    while (true) {
+      if (this.ehToken('DELIMITADOR', '.')) {
+        this.consumir('DELIMITADOR', '.');
+        const propriedade = this.consumir('IDENTIFICADOR');
+        expressao = {
+          tipo: 'AcessoMembro',
+          objeto: expressao,
+          propriedade: propriedade.valor,
+          linha: propriedade.linha,
+          coluna: propriedade.coluna
+        };
+      } 
+      else if (this.ehToken('DELIMITADOR', '(')) {
+        const tkAbertura = this.consumir('DELIMITADOR', '(');
+        const argumentos: NoExpressao[] = [];
+        
+        // Verifica se há argumentos
+        if (!this.ehToken('DELIMITADOR', ')')) {
+          argumentos.push(this.parseExpression());
+          while (this.ehToken('DELIMITADOR', ',')) {
+            this.consumir('DELIMITADOR', ',');
+            argumentos.push(this.parseExpression());
+          }
+        }
+        
+        this.consumir('DELIMITADOR', ')');
+        expressao = {
+          tipo: 'ChamadaFuncao',
+          callee: expressao,
+          argumentos,
+          linha: tkAbertura.linha,
+          coluna: tkAbertura.coluna
+        };
+      } 
+      else {
+        break; // Não é acesso de membro nem função, sai do loop
+      }
+    }
+
+    return expressao;
+  }
+
+  /**
    * Analisa a precedência de multiplicação, divisão e módulo.
-   * 
    * @returns O nó com a operação matemática estruturada.
    */
   private parseFator(): NoExpressao {
-    let esquerda = this.parseValue();
+    let esquerda = this.parseMembroOuChamada(); 
     
     while (this.ehToken('OPERADOR', '*') || this.ehToken('OPERADOR', '/') || this.ehToken('OPERADOR', '%')) {
       const operador = this.consumir('OPERADOR');
-      const direita = this.parseValue();
+      const direita = this.parseMembroOuChamada();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
     
     return esquerda;
   }
-
+ 
   /**
    * Analisa a precedência de adição e subtração.
    * 
@@ -359,5 +424,111 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       }
       throw e;
     }
+  }
+  /**
+   * Analisa a declaração de uma função e seus parâmetros.
+   */
+  private parseFunctionDeclaration(): NoDeclaracaoFuncao {
+    const tkKeyword = this.consumir('KEYWORD', 'FUNCTION');
+    const tkNome = this.consumir('IDENTIFICADOR');
+    
+    this.consumir('DELIMITADOR', '(');
+    const parametros: NoParametro[] = [];
+    
+    // Processa os parâmetros separados por vírgula
+    if (!this.ehToken('DELIMITADOR', ')')) {
+      const param = this.consumir('IDENTIFICADOR');
+      parametros.push({ tipo: "Parametro", nome: param.valor, linha: param.linha, coluna: param.coluna });
+      
+      while (this.ehToken('DELIMITADOR', ',')) {
+        this.consumir('DELIMITADOR', ',');
+        const proxParam = this.consumir('IDENTIFICADOR');
+        parametros.push({ tipo: "Parametro", nome: proxParam.valor, linha: proxParam.linha, coluna: proxParam.coluna });
+      }
+    }
+    
+    this.consumir('DELIMITADOR', ')');
+    
+    // O corpo da função é apenas um bloco comum
+    const corpo = this.parseBloco();
+
+    return {
+      tipo: 'DeclaracaoFuncao',
+      nome: tkNome.valor,
+      parametros,
+      corpo,
+      linha: tkKeyword.linha,
+      coluna: tkKeyword.coluna
+    };
+  }
+
+  /**
+   * Analisa a instrução de retorno (podendo ser vazia).
+   */
+  private parseReturn(): NoReturnStatement {
+    const tk = this.consumir('KEYWORD', 'RETURN');
+    let argumento: NoExpressao | null = null;
+    
+    // Se não houver ; ou } imediatamente, significa que há um valor sendo retornado
+    if (!this.ehToken('DELIMITADOR', ';') && !this.ehToken('DELIMITADOR', '}')) {
+      argumento = this.parseExpression();
+    }
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'ReturnStatement',
+      argumento,
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
+  }
+    /**
+   * Analisa a instrução de salto de iteração (continue).
+   */
+  private parseContinue(): NoContinueStatement {
+    const tk = this.consumir('KEYWORD', 'CONTINUE');
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'ContinueStatement',
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
+  }
+  /**
+   * Analisa a instrução de interrupção de laço (break).
+   */
+  private parseBreak(): NoBreakStatement {
+    const tk = this.consumir('KEYWORD', 'BREAK');
+    
+    this.consumirOpcional('DELIMITADOR', ';');
+    
+    return {
+      tipo: 'BreakStatement',
+      linha: tk.linha,
+      coluna: tk.coluna
+    };
+  }
+  /**
+   * Analisa um laço de repetição (while).
+   */
+  private parseWhile(): NoDeclaracaoWhile {
+    const tkKeyword = this.consumir('KEYWORD', 'WHILE');
+    
+    this.consumir('DELIMITADOR', '(');
+    const condicao = this.parseExpression();
+    this.consumir('DELIMITADOR', ')');
+    
+    const corpo = this.parseBloco();
+
+    return {
+      tipo: 'DeclaracaoWhile',
+      condicao,
+      corpo,
+      linha: tkKeyword.linha,
+      coluna: tkKeyword.coluna
+    };
   }
 }
