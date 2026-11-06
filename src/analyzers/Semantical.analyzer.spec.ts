@@ -193,3 +193,150 @@ describe("SemanticalAnalyzer", () => {
     });
   });
 });
+
+/**
+ * Executa o pipeline léxico -> sintático -> semântico sobre um código-fonte.
+ * Lança o erro semântico, se houver.
+ */
+function semantico(codigo: string): NoStatement[] {
+  const client = cliente();
+  new LexAnalyzer(client).run({ input: codigo });
+
+  const sintatico = new SyntacticAnalyzer(client);
+  expect(sintatico.run()).toBe(true);
+
+  return new SemanticalAnalyzer(client).analisar(client.ast!);
+}
+
+describe("SemanticalAnalyzer - laços (for e while)", () => {
+  // ---------- for: casos válidos ----------
+  test("for: laço clássico válido é aceito", () => {
+    expect(() => semantico("for (let i = 0; i < 3; i += 1) { let x = i + 1; }")).not.toThrow();
+  });
+
+  test("for: variável de inicialização é visível na condição, atualização e corpo", () => {
+    expect(() =>
+      semantico("let total = 0; for (let i = 0; i < 10; i += 1) { total += i; }")
+    ).not.toThrow();
+  });
+
+  test("for: partes omitidas (for (;;)) com break são aceitas", () => {
+    expect(() => semantico("for (;;) { break; }")).not.toThrow();
+  });
+
+  test("for: inicialização por expressão usa variável já declarada", () => {
+    expect(() =>
+      semantico("let i = 0; for (i = 0; i < 3; i += 1) { }")
+    ).not.toThrow();
+  });
+
+  test("for: permite break e continue dentro do corpo", () => {
+    expect(() =>
+      semantico("for (let i = 0; i < 5; i += 1) { if (i > 2) { break; } continue; }")
+    ).not.toThrow();
+  });
+
+  test("for: variável do laço pode ser reutilizada em laços seguidos", () => {
+    expect(() =>
+      semantico("for (let i = 0; i < 2; i += 1) { } for (let i = 0; i < 2; i += 1) { }")
+    ).not.toThrow();
+  });
+
+  test("for: anota o tipo inferido da variável de inicialização", () => {
+    const [no] = semantico("for (let i = 0; i < 3; i += 1) { }");
+
+    expect(no).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: { nome: "i", tipoInferido: "number" },
+      condicao: { tipoInferido: "boolean" },
+    });
+  });
+
+  // ---------- for: casos inválidos ----------
+  test("for: condição não booleana lança erro", () => {
+    expect(() => semantico("for (let i = 0; 1; i += 1) { }")).toThrow(
+      /A condição do 'for' deve ser boolean, encontrado 'number'/
+    );
+  });
+
+  test("for: variável do laço não vaza para fora do escopo", () => {
+    expect(() =>
+      semantico("for (let i = 0; i < 3; i += 1) { } i = 1;")
+    ).toThrow(/A variável 'i' não foi declarada/);
+  });
+
+  test("for: variável não declarada na condição lança erro", () => {
+    expect(() => semantico("for (let i = 0; j < 3; i += 1) { }")).toThrow(
+      /A variável 'j' não foi declarada/
+    );
+  });
+
+  test("for: variável não declarada na atualização lança erro", () => {
+    expect(() => semantico("for (let i = 0; i < 3; j += 1) { }")).toThrow(
+      /A variável 'j' não foi declarada/
+    );
+  });
+
+  test("for: atualizar uma const lança erro", () => {
+    expect(() => semantico("for (const i = 0; i < 3; i += 1) { }")).toThrow(
+      /Não é possível reatribuir valor à constante 'i'/
+    );
+  });
+
+  test("for: atualização com tipo incompatível lança erro", () => {
+    expect(() => semantico("for (let i = 0; i < 3; i += \"a\") { }")).toThrow(
+      /O operador '\+=' não suporta os tipos 'number' e 'string'/
+    );
+  });
+
+  test("for: variável externa homônima e sombreamento no corpo são permitidos", () => {
+    expect(() =>
+      semantico("for (let i = 0; i < 3; i += 1) { } let i = 1; i = 2; for (let k = 0; k < 1; k += 1) { let k = 1; k = 2; }")
+    ).not.toThrow();
+  });
+
+  test("for: variável usada no corpo e não declarada lança erro", () => {
+    expect(() => semantico("for (let i = 0; i < 3; i += 1) { y = 1; }")).toThrow(
+      /A variável 'y' não foi declarada/
+    );
+  });
+
+  // ---------- break / continue ----------
+  test("break fora de laço lança erro", () => {
+    expect(() => semantico("break;")).toThrow(/'break' só pode ser usado dentro de um laço/);
+  });
+
+  test("continue fora de laço lança erro", () => {
+    expect(() => semantico("continue;")).toThrow(/'continue' só pode ser usado dentro de um laço/);
+  });
+
+  test("break dentro de função declarada dentro de um laço lança erro", () => {
+    expect(() =>
+      semantico("for (let i = 0; i < 3; i += 1) { function f() { break; } }")
+    ).toThrow(/'break' só pode ser usado dentro de um laço/);
+  });
+
+  // ---------- while ----------
+  test("while: laço válido com break é aceito", () => {
+    expect(() => semantico("let n = 0; while (n < 3) { n += 1; if (n > 1) { break; } }")).not.toThrow();
+  });
+
+  test("while: condição não booleana lança erro", () => {
+    expect(() => semantico("while (1) { }")).toThrow(
+      /A condição do 'while' deve ser boolean, encontrado 'number'/
+    );
+  });
+
+  test("while: o corpo é verificado (variável não declarada lança erro)", () => {
+    expect(() => semantico("while (true) { z = 1; }")).toThrow(
+      /A variável 'z' não foi declarada/
+    );
+  });
+
+  // ---------- condição com any ----------
+  test("condição com tipo any (parâmetro de função) é aceita no if e no for", () => {
+    expect(() =>
+      semantico("function f(n) { if (n > 1) { return n; } for (let i = 0; i < n; i += 1) { } }")
+    ).not.toThrow();
+  });
+});
