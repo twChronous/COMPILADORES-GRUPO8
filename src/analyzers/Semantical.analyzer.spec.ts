@@ -252,7 +252,7 @@ describe("SemanticalAnalyzer - laços (for e while)", () => {
     });
   });
 
-  // ---------- for: casos inválidos ----------
+  // for: casos inválidos 
   test("for: condição não booleana lança erro", () => {
     expect(() => semantico("for (let i = 0; 1; i += 1) { }")).toThrow(
       /A condição do 'for' deve ser boolean, encontrado 'number'/
@@ -301,7 +301,7 @@ describe("SemanticalAnalyzer - laços (for e while)", () => {
     );
   });
 
-  // ---------- break / continue ----------
+  // break / continue 
   test("break fora de laço lança erro", () => {
     expect(() => semantico("break;")).toThrow(/'break' só pode ser usado dentro de um laço/);
   });
@@ -316,7 +316,7 @@ describe("SemanticalAnalyzer - laços (for e while)", () => {
     ).toThrow(/'break' só pode ser usado dentro de um laço/);
   });
 
-  // ---------- while ----------
+  // while
   test("while: laço válido com break é aceito", () => {
     expect(() => semantico("let n = 0; while (n < 3) { n += 1; if (n > 1) { break; } }")).not.toThrow();
   });
@@ -333,7 +333,7 @@ describe("SemanticalAnalyzer - laços (for e while)", () => {
     );
   });
 
-  // ---------- condição com any ----------
+  // condição com any
   test("condição com tipo any (parâmetro de função) é aceita no if e no for", () => {
     expect(() =>
       semantico("function f(n) { if (n > 1) { return n; } for (let i = 0; i < n; i += 1) { } }")
