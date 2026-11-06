@@ -286,21 +286,34 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    * 
    * @returns O nó lógico estruturado na AST.
    */
-  private parseComparacao(): NoExpressao {
-    let esquerda = this.parseTermo();
-    
-    while (
-      this.ehToken('OPERADOR', '>') || this.ehToken('OPERADOR', '<') || 
-      this.ehToken('OPERADOR', '>=') || this.ehToken('OPERADOR', '<=') || 
-      this.ehToken('OPERADOR', '==') || this.ehToken('OPERADOR', '!=') ||
-      this.ehToken('OPERADOR', '&&') || this.ehToken('OPERADOR', '||')
-    ) {
+  private parseBinarioEsq(ops: string[], proximo: () => NoExpressao): NoExpressao {
+    let esquerda = proximo();
+    while (ops.some(op => this.ehToken('OPERADOR', op))) {
       const operador = this.consumir('OPERADOR');
-      const direita = this.parseTermo();
+      const direita = proximo();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-    
-    return esquerda;
+  return esquerda;
+}
+
+  private parseRelacional(): NoExpressao {
+    return this.parseBinarioEsq(['>', '<', '>=', '<='], () => this.parseTermo());
+  }
+
+  private parseIgualdade(): NoExpressao {
+    return this.parseBinarioEsq(['==', '!='], () => this.parseRelacional());
+  }
+
+  private parseE(): NoExpressao {
+    return this.parseBinarioEsq(['&&'], () => this.parseIgualdade());
+  }
+
+  private parseOu(): NoExpressao {
+    return this.parseBinarioEsq(['||'], () => this.parseE());
+  }
+
+  private parseComparacao(): NoExpressao {
+    return this.parseOu();
   }
 
   /**
