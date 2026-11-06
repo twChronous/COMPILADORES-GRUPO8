@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import SemanticalAnalyzer from "./Semantical.analyzer";
 import SyntacticAnalyzer from "./Syntactic.analyzer";
 import LexAnalyzer from "./Lexycal.analyzer";
-import type { ClientInterface, NoStatement } from "../utils/types";
+import type {
+  ClientInterface,
+  NoStatement,
+  NoExpressao
+} from "../utils/types";
 
 function cliente(): ClientInterface {
   return {
@@ -54,6 +58,34 @@ const se = (condicao: any, consequencia: NoStatement[], alternativa: NoStatement
   linha: l,
   coluna: c
 });
+
+const funcao = (
+  nome: string,
+  parametros: string[],
+  corpo: NoStatement[]
+): NoStatement => ({
+  tipo: "DeclaracaoFuncao",
+  nome,
+  parametros: parametros.map(nome => ({
+    tipo: "Parametro",
+    nome,
+    linha: l,
+    coluna: c
+  })),
+  corpo: bloco(corpo),
+  linha: l,
+  coluna: c
+});
+
+const retorno = (
+  argumento: NoExpressao | null
+): NoStatement => ({
+  tipo: "ReturnStatement",
+  argumento,
+  linha: l,
+  coluna: c
+});
+
 
 describe("SemanticalAnalyzer", () => {
   test("analisar: declaração let com número anota o tipo number", () => {
@@ -190,6 +222,154 @@ describe("SemanticalAnalyzer", () => {
       tipo: "DeclaracaoVariavel",
       nome: "x",
       tipoInferido: "number",
+    });
+  });
+
+  test("função deve ser registrada na tabela de símbolos", () => {
+    const client = cliente();
+
+    client.ast = [
+      funcao("soma", ["a", "b"], [
+        retorno(bin("+", id("a"), id("b")))
+      ])
+    ];
+
+    const analyzer = new SemanticalAnalyzer(client);
+
+    expect(analyzer.run()).toBe(true);
+
+    expect(client.tabelaSimbolos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nome: "soma",
+          tipo: "function",
+          escopo: "Global"
+        })
+      ])
+    );
+  });
+
+  test("parâmetros devem existir no escopo da função", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([
+      funcao("dobro", ["x"], [
+        retorno(bin("*", id("x"), num("2")))
+      ])
+    ])).not.toThrow();
+  });
+
+  test("parâmetros não devem ser acessíveis fora da função", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([
+      funcao("teste", ["x"], [
+        retorno(id("x"))
+      ]),
+      expr(id("x"))
+    ])).toThrow(/A variável 'x' não foi declarada/);
+  });
+
+  test("return fora de função deve gerar erro semântico", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([
+      retorno(num("10"))
+    ])).toThrow(/'return' só pode ser usado dentro/);
+  });
+
+  test("parâmetros duplicados devem gerar erro", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([
+      funcao("soma", ["a", "a"], [
+        retorno(id("a"))
+      ])
+    ])).toThrow(/já foi declarada neste escopo/);
+  });
+
+  test("return deve validar variáveis utilizadas", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([
+      funcao("teste", [], [
+        retorno(id("inexistente"))
+      ])
+    ])).toThrow(
+      /A variável 'inexistente' não foi declarada/
+    );
+  });
+
+  test("expressão retornada deve receber tipo inferido", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    const [resultado] = analyzer.analisar([
+      funcao("numero", [], [
+        retorno(num("10"))
+      ])
+    ]);
+
+    expect(resultado).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      corpo: {
+        corpo: [
+          {
+            tipo: "ReturnStatement",
+            argumento: {
+              tipo: "Literal",
+              tipoInferido: "number"
+            }
+          }
+        ]
+      }
+    });
+  });
+
+  test("return com valor deve registrar seu tipo inferido", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    const [resultado] = analyzer.analisar([
+      funcao("numero", [], [
+        retorno(num("10"))
+      ])
+    ]);
+
+    expect(resultado).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      corpo: {
+        corpo: [
+          {
+            tipo: "ReturnStatement",
+            tipoInferido: "number",
+            argumento: {
+              tipoInferido: "number"
+            }
+          }
+        ]
+      }
+    });
+  });
+
+  test("return sem valor deve inferir void", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    const [resultado] = analyzer.analisar([
+      funcao("sair", [], [
+        retorno(null)
+      ])
+    ]);
+
+    expect(resultado).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      corpo: {
+        corpo: [
+          {
+            tipo: "ReturnStatement",
+            argumento: null,
+            tipoInferido: "void"
+          }
+        ]
+      }
     });
   });
 });
