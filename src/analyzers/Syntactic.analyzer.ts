@@ -19,7 +19,7 @@ export class ParseError extends Error {
 export default class SyntacticAnalyzer extends AnalyzerModel {
   /** Índice do token atual em processamento. */
   private atual = 0;
-  
+
   /** Lista de mensagens de erro encontradas na análise. */
   private erros: string[] = [];
 
@@ -67,7 +67,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
         corpo.push(stmt);
       }
     }
-    this.client.ast = corpo;    
+    this.client.ast = corpo;
     if (this.erros.length > 0) {
       this.erros.forEach(err => this.client.LOG_ERR(err));
       return false;
@@ -150,7 +150,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     this.atual++;
     while (this.atual < this.client.tokens.length && this.espiar().tipo !== 'EOF') {
       if (this.client.tokens[this.atual - 1].valor === ';') return;
-      
+
       const tipo = this.espiar().tipo;
       if (tipo === 'KEYWORD' && ['LET', 'CONST', 'VAR', 'IF', 'FOR', 'WHILE', 'FUNCTION', 'RETURN'].includes(this.espiar().valor)) {
         return;
@@ -172,7 +172,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       this.atual++;
       return { ...coordenadas, tipo: 'Literal', tipoDado: token.tipo as "NUMERO" | "STRING" | "BOOLEAN", valor: token.valor };
     }
-    
+
     if (token.tipo === 'IDENTIFICADOR') {
       this.atual++;
       return { ...coordenadas, tipo: 'Identificador', nome: token.valor };
@@ -185,11 +185,11 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       return expr;
     }
 
-if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDEFINED')) {
+    if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDEFINED')) {
       this.consumir('KEYWORD', token.valor);
-      return { 
-        ...coordenadas, 
-        tipo: 'Literal', 
+      return {
+        ...coordenadas,
+        tipo: 'Literal',
         tipoDado: token.valor as "NULL" | "UNDEFINED", // Usa o valor e não o tipo
         valor: token.valor.toLowerCase() // "null" ou "undefined" minúsculos 
       };
@@ -218,11 +218,11 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
           linha: propriedade.linha,
           coluna: propriedade.coluna
         };
-      } 
+      }
       else if (this.ehToken('DELIMITADOR', '(')) {
         const tkAbertura = this.consumir('DELIMITADOR', '(');
         const argumentos: NoExpressao[] = [];
-        
+
         // Verifica se há argumentos
         if (!this.ehToken('DELIMITADOR', ')')) {
           argumentos.push(this.parseExpression());
@@ -231,7 +231,7 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
             argumentos.push(this.parseExpression());
           }
         }
-        
+
         this.consumir('DELIMITADOR', ')');
         expressao = {
           tipo: 'ChamadaFuncao',
@@ -240,7 +240,7 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
           linha: tkAbertura.linha,
           coluna: tkAbertura.coluna
         };
-      } 
+      }
       else {
         break; // Não é acesso de membro nem função, sai do loop
       }
@@ -254,17 +254,17 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    * @returns O nó com a operação matemática estruturada.
    */
   private parseFator(): NoExpressao {
-    let esquerda = this.parseMembroOuChamada(); 
-    
+    let esquerda = this.parseMembroOuChamada();
+
     while (this.ehToken('OPERADOR', '*') || this.ehToken('OPERADOR', '/') || this.ehToken('OPERADOR', '%')) {
       const operador = this.consumir('OPERADOR');
       const direita = this.parseMembroOuChamada();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-    
+
     return esquerda;
   }
- 
+
   /**
    * Analisa a precedência de adição e subtração.
    * 
@@ -272,36 +272,89 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    */
   private parseTermo(): NoExpressao {
     let esquerda = this.parseFator();
-    
+
     while (this.ehToken('OPERADOR', '+') || this.ehToken('OPERADOR', '-')) {
       const operador = this.consumir('OPERADOR');
       const direita = this.parseFator();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-    
+
     return esquerda;
   }
 
   /**
-   * Analisa operadores relacionais e lógicos.
-   * 
-   * @returns O nó lógico estruturado na AST.
+   * Analisa um nível de precedência de operadores binários associativos à esquerda.
+   *
+   * O método é genérico: cada nível de precedência (relacional, igualdade, `&&`, `||`)
+   * só informa quais operadores aceita e qual é o nível imediatamente superior.
+   * Assim, `a - b - c` e `a && b && c` são agrupados como `((a - b) - c)` e `((a && b) && c)`.
+   *
+   * @param ops Operadores aceitos neste nível (ex.: `['==', '!=']`).
+   * @param proximo Função que analisa o nível de precedência imediatamente superior.
+   * @returns O nó `ExpressaoBinaria` encadeado à esquerda, ou o próprio operando se não houver operador.
+   * @throws {ParseError} Se faltar o operando da direita após um operador.
    */
-  private parseComparacao(): NoExpressao {
-    let esquerda = this.parseTermo();
-    
-    while (
-      this.ehToken('OPERADOR', '>') || this.ehToken('OPERADOR', '<') || 
-      this.ehToken('OPERADOR', '>=') || this.ehToken('OPERADOR', '<=') || 
-      this.ehToken('OPERADOR', '==') || this.ehToken('OPERADOR', '!=') ||
-      this.ehToken('OPERADOR', '&&') || this.ehToken('OPERADOR', '||')
-    ) {
+  private parseBinarioEsq(ops: string[], proximo: () => NoExpressao): NoExpressao {
+    let esquerda = proximo();
+    while (ops.some(op => this.ehToken('OPERADOR', op))) {
       const operador = this.consumir('OPERADOR');
-      const direita = this.parseTermo();
+      const direita = proximo();
       esquerda = { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-    
     return esquerda;
+  }
+
+  /**
+   * Analisa operadores relacionais (`>`, `<`, `>=`, `<=`).
+   * Seus operandos são expressões aritméticas (ver `parseTermo`).
+   *
+   * @returns O nó relacional, ou o operando aritmético se não houver operador relacional.
+   */
+  private parseRelacional(): NoExpressao {
+    return this.parseBinarioEsq(['>', '<', '>=', '<='], () => this.parseTermo());
+  }
+
+  /**
+   * Analisa operadores de igualdade (`==`, `!=`).
+   * Tem precedência menor que a dos relacionais: `a == b < c` equivale a `a == (b < c)`.
+   *
+   * @returns O nó de igualdade, ou o operando relacional se não houver operador de igualdade.
+   */
+  private parseIgualdade(): NoExpressao {
+    return this.parseBinarioEsq(['==', '!='], () => this.parseRelacional());
+  }
+
+  /**
+   * Analisa o operador lógico E (`&&`).
+   * Tem precedência menor que a da igualdade e maior que a do `||`:
+   * `a || b && c` equivale a `a || (b && c)`.
+   *
+   * @returns O nó `&&`, ou o operando de igualdade se não houver `&&`.
+   */
+  private parseE(): NoExpressao {
+    return this.parseBinarioEsq(['&&'], () => this.parseIgualdade());
+  }
+
+  /**
+   * Analisa o operador lógico OU (`||`), o de menor precedência entre os operadores binários.
+   *
+   * @returns O nó `||`, ou o operando `&&` se não houver `||`.
+   */
+  private parseOu(): NoExpressao {
+    return this.parseBinarioEsq(['||'], () => this.parseE());
+  }
+
+  /**
+   * Ponto de entrada para operadores relacionais, de igualdade e lógicos.
+   *
+   * Percorre a cadeia de precedência, da menor para a maior:
+   * `||` → `&&` → `==`/`!=` → `>`/`<`/`>=`/`<=` → `+`/`-`.
+   * É chamado por `parseExpression`, que ainda trata as atribuições.
+   *
+   * @returns O nó principal da expressão, sem atribuição.
+   */
+  private parseComparacao(): NoExpressao {
+    return this.parseOu();
   }
 
   /**
@@ -311,13 +364,13 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    */
   private parseExpression(): NoExpressao {
     let esquerda = this.parseComparacao();
-    
+
     if (this.ehToken('OPERADOR', '=') || this.ehToken('OPERADOR', '+=') || this.ehToken('OPERADOR', '-=')) {
       const operador = this.consumir('OPERADOR');
-      const direita = this.parseExpression(); 
+      const direita = this.parseExpression();
       return { tipo: 'ExpressaoBinaria', operador: operador.valor, esquerda, direita, linha: operador.linha, coluna: operador.coluna };
     }
-    
+
     return esquerda;
   }
 
@@ -376,7 +429,7 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    */
   private parseIf(): NoDeclaracaoIf {
     const tk = this.consumir('KEYWORD', 'IF');
-    
+
     this.consumir('DELIMITADOR', '(');
     const condicao = this.parseExpression();
     this.consumir('DELIMITADOR', ')');
@@ -406,17 +459,17 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
   private parseStatement(): NoStatement | null {
     try {
       const token = this.espiar();
-      
+
       if (token.tipo === 'KEYWORD') {
         const parser = this.roteadorStatement[token.valor];
         if (parser) {
           return parser();
         }
       }
-      
+
       const expressao = this.parseExpression();
       this.consumirOpcional('DELIMITADOR', ';');
-      
+
       return {
         tipo: 'ExpressaoStatement',
         expressao,
@@ -437,24 +490,24 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
   private parseFunctionDeclaration(): NoDeclaracaoFuncao {
     const tkKeyword = this.consumir('KEYWORD', 'FUNCTION');
     const tkNome = this.consumir('IDENTIFICADOR');
-    
+
     this.consumir('DELIMITADOR', '(');
     const parametros: NoParametro[] = [];
-    
+
     // Processa os parâmetros separados por vírgula
     if (!this.ehToken('DELIMITADOR', ')')) {
       const param = this.consumir('IDENTIFICADOR');
       parametros.push({ tipo: "Parametro", nome: param.valor, linha: param.linha, coluna: param.coluna });
-      
+
       while (this.ehToken('DELIMITADOR', ',')) {
         this.consumir('DELIMITADOR', ',');
         const proxParam = this.consumir('IDENTIFICADOR');
         parametros.push({ tipo: "Parametro", nome: proxParam.valor, linha: proxParam.linha, coluna: proxParam.coluna });
       }
     }
-    
+
     this.consumir('DELIMITADOR', ')');
-    
+
     // O corpo da função é apenas um bloco comum
     const corpo = this.parseBloco();
 
@@ -474,14 +527,14 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
   private parseReturn(): NoReturnStatement {
     const tk = this.consumir('KEYWORD', 'RETURN');
     let argumento: NoExpressao | null = null;
-    
+
     // Se não houver ; ou } imediatamente, significa que há um valor sendo retornado
     if (!this.ehToken('DELIMITADOR', ';') && !this.ehToken('DELIMITADOR', '}')) {
       argumento = this.parseExpression();
     }
-    
+
     this.consumirOpcional('DELIMITADOR', ';');
-    
+
     return {
       tipo: 'ReturnStatement',
       argumento,
@@ -489,14 +542,14 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
       coluna: tk.coluna
     };
   }
-    /**
-   * Analisa a instrução de salto de iteração (continue).
-   */
+  /**
+ * Analisa a instrução de salto de iteração (continue).
+ */
   private parseContinue(): NoContinueStatement {
     const tk = this.consumir('KEYWORD', 'CONTINUE');
-    
+
     this.consumirOpcional('DELIMITADOR', ';');
-    
+
     return {
       tipo: 'ContinueStatement',
       linha: tk.linha,
@@ -508,9 +561,9 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    */
   private parseBreak(): NoBreakStatement {
     const tk = this.consumir('KEYWORD', 'BREAK');
-    
+
     this.consumirOpcional('DELIMITADOR', ';');
-    
+
     return {
       tipo: 'BreakStatement',
       linha: tk.linha,
@@ -522,11 +575,11 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
    */
   private parseWhile(): NoDeclaracaoWhile {
     const tkKeyword = this.consumir('KEYWORD', 'WHILE');
-    
+
     this.consumir('DELIMITADOR', '(');
     const condicao = this.parseExpression();
     this.consumir('DELIMITADOR', ')');
-    
+
     const corpo = this.parseBloco();
 
     return {
