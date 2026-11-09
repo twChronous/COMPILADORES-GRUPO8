@@ -86,6 +86,58 @@ const retorno = (
   coluna: c
 });
 
+const enquanto = (condicao: any, corpo: NoStatement[]): NoStatement => ({
+  tipo: "DeclaracaoWhile",
+  condicao,
+  corpo: bloco(corpo),
+  linha: l,
+  coluna: c
+});
+
+const lacoFor = (
+  inicializacao: NoStatement | null,
+  condicao: any,
+  atualizacao: any,
+  corpo: NoStatement[]
+): NoStatement =>
+  ({
+    tipo: "DeclaracaoFor",
+    inicializacao,
+    condicao,
+    atualizacao,
+    corpo: bloco(corpo),
+    linha: l,
+    coluna: c,
+  }) as unknown as NoStatement;
+
+const membro = (objeto: any, propriedade: string) => ({
+  tipo: "AcessoMembro" as const,
+  objeto,
+  propriedade,
+  linha: l,
+  coluna: c
+});
+
+const chamada = (callee: any, argumentos: any[]) => ({
+  tipo: "ChamadaFuncao" as const,
+  callee,
+  argumentos,
+  linha: l,
+  coluna: c
+});
+
+const interrupcao = (): NoStatement => ({
+  tipo: "BreakStatement",
+  linha: l,
+  coluna: c
+});
+
+const continua = (): NoStatement => ({
+  tipo: "ContinueStatement",
+  linha: l,
+  coluna: c
+});
+
 
 describe("SemanticalAnalyzer", () => {
   test("analisar: declaração let com número anota o tipo number", () => {
@@ -371,5 +423,112 @@ describe("SemanticalAnalyzer", () => {
         ]
       }
     });
+  });
+
+  test("break fora de laço deve gerar erro semântico", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([interrupcao()])).toThrow(
+      /'break' só pode ser usado dentro de um laço/
+    );
+  });
+
+  test("continue fora de laço deve gerar erro semântico", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() => analyzer.analisar([continua()])).toThrow(
+      /'continue' só pode ser usado dentro de um laço/
+    );
+  });
+
+  test("chamada de função nativa console.log é aceita", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([
+        expr(chamada(membro(id("console"), "log"), [str("oi")])),
+      ])
+    ).not.toThrow();
+  });
+
+  test("chamada com identificador não declarado lança erro", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([expr(chamada(id("soma"), [num("1")]))])
+    ).toThrow(/A variável 'soma' não foi declarada/);
+  });
+
+  test("operadores lógicos exigem boolean nos dois lados", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([decl("let", "ok", bin("&&", num("1"), bool("true")))])
+    ).toThrow(/O operador '&&' não aceita/);
+  });
+
+  test("pipeline: função com return passa pelo léxico, sintático e semântico", () => {
+    const client = cliente();
+    const lex = new LexAnalyzer(client);
+    lex.run({
+      input: "function dobro(x) { return x * 2; } let r = dobro(3);",
+    });
+
+    const sintatico = new SyntacticAnalyzer(client);
+    expect(sintatico.run()).toBe(true);
+
+    const semantico = new SemanticalAnalyzer(client);
+    expect(semantico.run()).toBe(true);
+    expect(client.ast?.[0]).toMatchObject({ tipo: "DeclaracaoFuncao", nome: "dobro" });
+  });
+
+  // Verificação semântica de while ainda não trata DeclaracaoWhile na main (#43 / PR #57/#58).
+  test.skip("while: condição deve ser boolean", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([enquanto(num("1"), [])])
+    ).toThrow(/condição.*while.*boolean/i);
+  });
+
+  test.skip("while: variável do corpo não vaza para fora", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([
+        enquanto(bool("true"), [decl("let", "y", num("1"))]),
+        expr(id("y")),
+      ])
+    ).toThrow(/A variável 'y' não foi declarada/);
+  });
+
+  test.skip("while: break dentro do laço é permitido", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([enquanto(bool("true"), [interrupcao()])])
+    ).not.toThrow();
+  });
+
+  // Parsing/semântica de for ainda não estão na main (#39 / #44 / PR #57).
+  test.skip("for: condição deve ser boolean", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([
+        lacoFor(decl("let", "i", num("0")), num("1"), bin("=", id("i"), num("1")), []),
+      ])
+    ).toThrow(/condição.*for.*boolean/i);
+  });
+
+  test.skip("for: variável da inicialização não vaza para fora", () => {
+    const analyzer = new SemanticalAnalyzer(cliente());
+
+    expect(() =>
+      analyzer.analisar([
+        lacoFor(decl("let", "i", num("0")), bin("<", id("i"), num("10")), null, []),
+        expr(id("i")),
+      ])
+    ).toThrow(/A variável 'i' não foi declarada/);
   });
 });

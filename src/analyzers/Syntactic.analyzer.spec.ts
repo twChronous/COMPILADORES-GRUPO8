@@ -257,4 +257,199 @@ describe("SyntacticAnalyzer", () => {
     expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
   });
 
+  test("deve gerar AST para declaração com string e boolean", () => {
+    const { ast, sucesso } = analisarCodigo('let nome = "ana"; const ok = true;');
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoVariavel",
+      modificador: "let",
+      nome: "nome",
+      valorInicial: { tipo: "Literal", tipoDado: "STRING", valor: "ana" },
+    });
+    expect(ast?.[1]).toMatchObject({
+      tipo: "DeclaracaoVariavel",
+      modificador: "const",
+      nome: "ok",
+      valorInicial: { tipo: "Literal", tipoDado: "BOOLEAN", valor: "true" },
+    });
+  });
+
+  test("deve processar if sem else", () => {
+    const { ast, sucesso } = analisarCodigo("if (x == 1) { y = 2; }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoIf",
+      condicao: { operador: "==" },
+      consequencia: { tipo: "Bloco" },
+      alternativa: null,
+    });
+  });
+
+  test("deve rejeitar if sem parênteses na condição", () => {
+    const { sucesso, erros } = analisarCodigo("if x > 1 { y = 0; }");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.length).toBeGreaterThan(0);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
+  test("deve gerar AST para while com condição e corpo", () => {
+    const { ast, sucesso, erros } = analisarCodigo(
+      "while (x > 0) { x = x - 1; }"
+    );
+
+    expect(sucesso).toBe(true);
+    expect(erros).toHaveLength(0);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoWhile",
+      condicao: {
+        tipo: "ExpressaoBinaria",
+        operador: ">",
+        esquerda: { tipo: "Identificador", nome: "x" },
+        direita: { tipo: "Literal", valor: "0" },
+      },
+      corpo: {
+        tipo: "Bloco",
+        corpo: [
+          {
+            tipo: "ExpressaoStatement",
+            expressao: { tipo: "ExpressaoBinaria", operador: "=" },
+          },
+        ],
+      },
+    });
+  });
+
+  test("deve reconhecer break e continue dentro do while", () => {
+    const { ast, sucesso } = analisarCodigo(
+      "while (true) { break; continue; }"
+    );
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoWhile",
+      corpo: {
+        corpo: [
+          { tipo: "BreakStatement" },
+          { tipo: "ContinueStatement" },
+        ],
+      },
+    });
+  });
+
+  test("deve rejeitar while sem bloco", () => {
+    const { sucesso, erros } = analisarCodigo("while (x > 0) x = x - 1;");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.length).toBeGreaterThan(0);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
+  // Parsing de for ainda não está na main (#39 / PR #57).
+  test.skip("deve gerar AST para laço for clássico", () => {
+    const { ast, sucesso } = analisarCodigo(
+      "for (let i = 0; i < 10; i = i + 1) { x = i; }"
+    );
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: {
+        tipo: "DeclaracaoVariavel",
+        nome: "i",
+        valorInicial: { tipo: "Literal", valor: "0" },
+      },
+      condicao: { operador: "<" },
+      atualizacao: { operador: "=" },
+      corpo: { tipo: "Bloco" },
+    });
+  });
+
+  test("deve reconhecer chamada de função com argumentos", () => {
+    const { ast, sucesso } = analisarCodigo("soma(1, 2);");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        tipo: "ChamadaFuncao",
+        callee: { tipo: "Identificador", nome: "soma" },
+        argumentos: [
+          { tipo: "Literal", valor: "1" },
+          { tipo: "Literal", valor: "2" },
+        ],
+      },
+    });
+  });
+
+  test("deve reconhecer acesso a membro e chamada encadeada", () => {
+    const { ast, sucesso } = analisarCodigo('console.log("oi");');
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        tipo: "ChamadaFuncao",
+        callee: {
+          tipo: "AcessoMembro",
+          objeto: { tipo: "Identificador", nome: "console" },
+          propriedade: "log",
+        },
+        argumentos: [{ tipo: "Literal", tipoDado: "STRING", valor: "oi" }],
+      },
+    });
+  });
+
+  test("deve respeitar divisão e módulo na precedência de fatores", () => {
+    const { ast, sucesso } = analisarCodigo("resultado = 8 / 2 % 3;");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        operador: "=",
+        direita: {
+          tipo: "ExpressaoBinaria",
+          operador: "%",
+          esquerda: {
+            tipo: "ExpressaoBinaria",
+            operador: "/",
+            esquerda: { valor: "8" },
+            direita: { valor: "2" },
+          },
+          direita: { valor: "3" },
+        },
+      },
+    });
+  });
+
+  test("deve gerar expressão relacional e lógica com parênteses", () => {
+    // Na main, relacionais e lógicos compartilham o mesmo nível; parênteses fixam o agrupamento.
+    const { ast, sucesso } = analisarCodigo("ok = (a >= 1) && (b != 0);");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        operador: "=",
+        direita: {
+          tipo: "ExpressaoBinaria",
+          operador: "&&",
+          esquerda: { operador: ">=" },
+          direita: { operador: "!=" },
+        },
+      },
+    });
+  });
+
+  test("deve rejeitar expressão com parêntese não fechado", () => {
+    const { sucesso, erros } = analisarCodigo("x = (1 + 2;");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.length).toBeGreaterThan(0);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
 });
