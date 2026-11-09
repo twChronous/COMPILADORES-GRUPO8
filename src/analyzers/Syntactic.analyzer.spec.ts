@@ -129,6 +129,83 @@ describe("SyntacticAnalyzer", () => {
     expect(ast?.[1].tipo).toBe("DeclaracaoVariavel");
   });
 
+  test("for: deve reconhecer a forma clássica com declaração, condição e atualização", () => {
+    const { ast, sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1) { x = i; }");
+
+    expect(sucesso).toBe(true);
+    expect(erros).toHaveLength(0);
+    expect(ast).toHaveLength(1);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: {
+        tipo: "DeclaracaoVariavel",
+        modificador: "let",
+        nome: "i",
+        valorInicial: { tipo: "Literal", valor: "0" }
+      },
+      condicao: {
+        tipo: "ExpressaoBinaria",
+        operador: "<",
+        esquerda: { tipo: "Identificador", nome: "i" },
+        direita: { tipo: "Literal", valor: "3" }
+      },
+      atualizacao: {
+        tipo: "ExpressaoBinaria",
+        operador: "+=",
+        esquerda: { tipo: "Identificador", nome: "i" },
+        direita: { tipo: "Literal", valor: "1" }
+      },
+      corpo: {
+        tipo: "Bloco",
+        corpo: [{ tipo: "ExpressaoStatement" }]
+      }
+    });
+  });
+
+  test("for: inicialização pode ser uma expressão de atribuição", () => {
+    const { ast, sucesso } = analisarCodigo("for (i = 0; i < 3; i += 1) { }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: { tipo: "ExpressaoStatement", expressao: { operador: "=" } }
+    });
+  });
+
+  test("for: as três partes podem ser omitidas (for (;;))", () => {
+    const { ast, sucesso } = analisarCodigo("for (;;) { break; }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: null,
+      condicao: null,
+      atualizacao: null,
+      corpo: { corpo: [{ tipo: "BreakStatement" }] }
+    });
+  });
+
+  test("for: falta de ';' após a inicialização gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0 i < 3; i += 1) { }");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
+  test("for: falta de ')' gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1 { }");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Esperado '\)'/);
+  });
+
+  test("for: sem bloco '{' gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1) x = 1;");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Esperado '\{'/);
+  });
+
   test("Panic Mode: deve recuperar-se de um erro de sintaxe e continuar a análise", () => {
     // A primeira instrução tem um erro (faltando valor após o '='), a segunda é válida
     const { ast, sucesso, erros } = analisarCodigo("let falho = ; let correto = 10;");

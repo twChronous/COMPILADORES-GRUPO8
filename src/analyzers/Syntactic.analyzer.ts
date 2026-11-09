@@ -1,5 +1,5 @@
 import AnalyzerModel from "../models/Analyzer.model";
-import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro, NoContinueStatement, NoBreakStatement, NoDeclaracaoWhile } from "../utils/types";
+import { ClientInterface, lexicTokens, TokensType, NoStatement, NoExpressao, NoBloco, NoDeclaracaoVariavel, NoDeclaracaoIf, NoReturnStatement, NoDeclaracaoFuncao, NoParametro, NoContinueStatement, NoBreakStatement, NoDeclaracaoWhile, NoDeclaracaoFor, NoExpressaoStatement } from "../utils/types";
 
 /**
  * Representa um erro encontrado durante a análise sintática.
@@ -37,6 +37,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
     BREAK: () => this.parseBreak(),
     CONTINUE: () => this.parseContinue(),
     WHILE: () => this.parseWhile(),
+    FOR: () => this.parseFor(),
   };
 
   /**
@@ -151,7 +152,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       if (this.client.tokens[this.atual - 1].valor === ';') return;
       
       const tipo = this.espiar().tipo;
-      if (tipo === 'KEYWORD' && ['LET', 'CONST', 'VAR', 'IF'].includes(this.espiar().valor)) {
+      if (tipo === 'KEYWORD' && ['LET', 'CONST', 'VAR', 'IF', 'FOR', 'WHILE', 'FUNCTION', 'RETURN'].includes(this.espiar().valor)) {
         return;
       }
       this.atual++;
@@ -322,16 +323,21 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
 
   /**
    * Analisa uma declaração de variável.
-   * 
+   *
+   * @param exigirPontoEVirgula Se `true`, o `;` final é obrigatório (usado na inicialização do `for`).
    * @returns O nó de declaração na AST.
    */
-  private parseDeclaration(): NoDeclaracaoVariavel {
+  private parseDeclaration(exigirPontoEVirgula = false): NoDeclaracaoVariavel {
     const tkKeyword = this.consumir('KEYWORD');
     const identificador = this.consumir('IDENTIFICADOR');
-    
+
     this.consumir('OPERADOR', '=');
     const valorInicial = this.parseExpression();
-    this.consumirOpcional('DELIMITADOR', ';');
+    if (exigirPontoEVirgula) {
+      this.consumir('DELIMITADOR', ';');
+    } else {
+      this.consumirOpcional('DELIMITADOR', ';');
+    }
 
     return {
       tipo: 'DeclaracaoVariavel',
@@ -526,6 +532,65 @@ if (token.tipo === 'KEYWORD' && (token.valor === 'NULL' || token.valor === 'UNDE
     return {
       tipo: 'DeclaracaoWhile',
       condicao,
+      corpo,
+      linha: tkKeyword.linha,
+      coluna: tkKeyword.coluna
+    };
+  }
+
+  /**
+   * Analisa o laço `for` clássico: `for (inicialização; condição; atualização) { ... }`.
+   * Cada uma das três partes pode ser omitida (ex: `for (;;) { ... }`).
+   *
+   * @returns O nó `DeclaracaoFor` na AST.
+   */
+  private parseFor(): NoDeclaracaoFor {
+    const tkKeyword = this.consumir('KEYWORD', 'FOR');
+    this.consumir('DELIMITADOR', '(');
+
+    // 1. Inicialização: declaração, expressão ou vazia
+    let inicializacao: NoDeclaracaoVariavel | NoExpressaoStatement | null = null;
+    if (this.ehToken('DELIMITADOR', ';')) {
+      this.consumir('DELIMITADOR', ';');
+    } else if (
+      this.ehToken('KEYWORD', 'LET') ||
+      this.ehToken('KEYWORD', 'CONST') ||
+      this.ehToken('KEYWORD', 'VAR')
+    ) {
+      inicializacao = this.parseDeclaration(true);
+    } else {
+      const tkInicio = this.espiar();
+      const expressao = this.parseExpression();
+      this.consumir('DELIMITADOR', ';');
+      inicializacao = {
+        tipo: 'ExpressaoStatement',
+        expressao,
+        linha: tkInicio.linha,
+        coluna: tkInicio.coluna
+      };
+    }
+
+    // 2. Condição (opcional)
+    let condicao: NoExpressao | null = null;
+    if (!this.ehToken('DELIMITADOR', ';')) {
+      condicao = this.parseExpression();
+    }
+    this.consumir('DELIMITADOR', ';');
+
+    // 3. Atualização (opcional)
+    let atualizacao: NoExpressao | null = null;
+    if (!this.ehToken('DELIMITADOR', ')')) {
+      atualizacao = this.parseExpression();
+    }
+    this.consumir('DELIMITADOR', ')');
+
+    const corpo = this.parseBloco();
+
+    return {
+      tipo: 'DeclaracaoFor',
+      inicializacao,
+      condicao,
+      atualizacao,
       corpo,
       linha: tkKeyword.linha,
       coluna: tkKeyword.coluna
