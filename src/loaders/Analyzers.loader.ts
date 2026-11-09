@@ -1,72 +1,27 @@
-import path from 'node:path';
-import { readdir } from "node:fs/promises";
 import { ClientInterface } from '../utils/types';
 import AnalyzerModel from '../models/Analyzer.model';
 
-/**
- * Configuration interface for AnalyzerLoader
- * @interface AnalyzerLoaderConfig
- */
-interface AnalyzerLoaderConfig {
-  /** 
-   * Directory path containing analyzer files
-   * @type {string}
-   */
-  DIR_ANALYZER: string;
-
-  /** 
-   * Supported file extensions for analyzer discovery
-   * @type {string[]}
-   */
-  ANALYZER_EXTENSIONS: string[];
-
-  /** 
-   * Maximum directory depth for recursive analyzer discovery
-   * @type {number}
-   */
-  MAX_ROUTE_DEPTH: number;
-
-  /** 
-   * Optional regex patterns to ignore during analyzer file discovery
-   * @type {RegExp[]}
-   */
-  IGNORE_PATTERNS?: RegExp[];
-}
+// Importa dinamicamente a lista do arquivo que é auto-gerado antes do build
+import { ANALYZERS_REGISTRY } from './analyzers.registry';
 
 /**
- * Configuração padrão para o carregador de analisadores.
- * 
- * `import.meta.dir` ancora o caminho ao Virtual File System (VFS) do Bun durante a compilação,
- * impedindo que o executável procure a pasta no disco físico do usuário.
- * 
- * @type {AnalyzerLoaderConfig}
- */
-const CONFIG: AnalyzerLoaderConfig = {
-  DIR_ANALYZER: path.join(import.meta.dir, '../analyzers'),
-  ANALYZER_EXTENSIONS: ['.ts'],
-  MAX_ROUTE_DEPTH: 5,
-  IGNORE_PATTERNS: [
-    /\.spec\.[tj]s$/, // Ignora arquivos de teste
-    /\.d\.ts$/, // Ignora arquivos de definição de tipos
-  ]
-};
-
-/**
- * AnalyzerLoader - A dynamic and robust analyzer discovery and registration system
+ * AnalyzerLoader - Sistema dinâmico e robusto de descoberta e registro de analisadores.
  * 
  * @class
- * @description Automatically discovers, validates, and registers application analyzers
+ * @description Descobre automaticamente, valida e registra os analisadores da aplicação.
  */
 export default class AnalyzerLoader {
   /**
-   * Unique identifier for the AnalyzerLoader instance
+   * Identificador único para a instância do AnalyzerLoader.
+   * 
    * @type {string}
    * @readonly
    */
   public readonly name: string = 'AnalyzerLoader';
 
   /**
-   * Client interface for logging and analyzer management
+   * Interface do cliente para gerenciamento de logs e estado.
+   * 
    * @type {ClientInterface}
    * @private
    * @readonly
@@ -74,68 +29,63 @@ export default class AnalyzerLoader {
   private readonly client: ClientInterface;
 
   /**
-   * Merged configuration for analyzer loading
-   * @type {AnalyzerLoaderConfig}
-   * @private
-   * @readonly
-   */
-  private readonly config: AnalyzerLoaderConfig;
-
-  /**
-   * Creates an instance of AnalyzerLoader
+   * Cria uma instância do AnalyzerLoader.
    * 
    * @constructor
-   * @param {ClientInterface} client - The client interface for analyzer management
-   * @param {Partial<AnalyzerLoaderConfig>} [customConfig={}] - Optional custom configuration
+   * @param {ClientInterface} client A interface do cliente para gerenciamento.
    */
-  constructor(
-    client: ClientInterface, 
-    customConfig: Partial<AnalyzerLoaderConfig> = {}
-  ) {
+  constructor(client: ClientInterface) {
     this.client = client;
-    this.config = { ...CONFIG, ...customConfig };
   }
 
   /**
-   * Loads analyzer from the specified directory
+   * Carrega os analisadores a partir do registro estático gerado pré-build.
+   * 
+   * A linha de raciocínio elimina a leitura de disco (fs) e caminhos virtuais.
+   * Ao utilizar o `ANALYZERS_REGISTRY`, o bundler embute as dependências nativamente,
+   * garantindo execução instantânea e à prova de falhas em qualquer sistema operacional.
    * 
    * @async
-   * @returns {Promise<{
-   *   totalAnalyzers: number, 
-   *   loadTime: number, 
-   *   failedAnalyzers: string[]
-   * }>} Analyzer loading metrics
-   * 
-   * @throws {Error} If critical error occurs during analyzer loading
+   * @returns {Promise<{totalAnalyzers: number, loadTime: number, failedAnalyzers: string[]}>} Métricas de carregamento.
+   * @throws {Error} Se ocorrer um erro crítico durante o carregamento.
    */
   public async load(): Promise<{ 
     totalAnalyzers: number; 
     loadTime: number; 
     failedAnalyzers: string[] 
   }> {
+    // Registra o tempo exato do início da operação
     const startTime = performance.now();
+    
+    // Inicia um array vazio para guardar o nome dos analisadores que falharem
     const failedAnalyzers: string[] = [];
 
     try {
-      const analyzerFiles = await this.findAnalyzerFiles(this.config.DIR_ANALYZER);
-      
-      if (analyzerFiles.length === 0) {
-        this.client.LOG_WARN('No analyzer files discovered', this.name);
+      // Verifica se o registro auto-gerado possui classes mapeadas
+      if (ANALYZERS_REGISTRY.length === 0) {
+        // Dispara um aviso nos logs se o registro estiver vazio
+        this.client.LOG_WARN('No analyzer files discovered in registry', this.name);
+        // Encerra o carregamento retornando métricas zeradas
         return { totalAnalyzers: 0, loadTime: 0, failedAnalyzers: [] };
       }
 
-      const analyzerRegistrations = await this.registerAnalyzer(analyzerFiles);
+      // Inicia o processo de registro de todas as classes do registro
+      const analyzerRegistrations = await this.registerAnalyzers(ANALYZERS_REGISTRY);
 
+      // Calcula o tempo total decorrido subtraindo o tempo inicial do atual
       const loadTime = performance.now() - startTime;
       
+      // Imprime o resumo da operação nos logs indicando sucessos e falhas
       this.client.LOG(
         `Loaded ${analyzerRegistrations.successful.length} analyzers ` +
         `(${analyzerRegistrations.failed.length} failed) in ${loadTime.toFixed(2)}ms`, 
         this.name
       );
 
+      // Adiciona as classes reprovadas ao array de retorno
       failedAnalyzers.push(...analyzerRegistrations.failed);
 
+      // Retorna o pacote de métricas consolidado
       return {
         totalAnalyzers: analyzerRegistrations.successful.length,
         loadTime,
@@ -143,188 +93,98 @@ export default class AnalyzerLoader {
       };
 
     } catch (error) {
+      // Direciona erros críticos de execução para o tratador central
       this.handleLoadError(error);
       throw error;
     }
   }
 
   /**
-   * Descobre arquivos de analisadores embutidos no sistema de arquivos virtual (VFS).
-   * 
-   * A linha de raciocínio substitui o `Bun.Glob` (que requer o sistema de arquivos físico)
-   * pela função nativa `readdir` do Node com recursão ativada. O Bun intercepta o módulo `fs`
-   * em binários compilados, permitindo que a varredura ocorra perfeitamente dentro 
-   * dos assets embutidos em memória.
+   * Registra múltiplos analisadores paralelamente e mapeia resultados.
    * 
    * @private
-   * @param {string} dirPath O diretório raiz para buscar os analisadores.
-   * @returns {Promise<string[]>} Lista de caminhos completos dos arquivos encontrados.
+   * @param {any[]} classes Lista de classes de analisadores do registro.
+   * @returns {Promise<{successful: string[], failed: string[]}>} Separação de sucessos e falhas.
    */
-  private async findAnalyzerFiles(dirPath: string): Promise<string[]> {
-    try {
-      // Cria um array vazio para armazenar os caminhos aprovados
-      const files: string[] = [];
-      
-      // Lê todo o conteúdo do diretório recursivamente na memória virtual (VFS)
-      // Esta API nativa retorna um array de strings com os caminhos relativos
-      const entries = await readdir(dirPath, { recursive: true });
-
-      // Inicia um laço de repetição para processar cada entrada do diretório
-      for (const relativePath of entries) {
-        // Converte o caminho relativo para string garantindo o formato correto
-        const rawPath = relativePath.toString();
-        // Substitui barras invertidas do Windows por barras convencionais
-        const normalizedPath = rawPath.replace(/\\/g, '/');
-        // Extrai apenas o nome do arquivo presente no final do caminho
-        const fileName = path.basename(normalizedPath);
-        
-        // Verifica se a extensão do arquivo pertence à lista configurada
-        // O array config.ANALYZER_EXTENSIONS dita os formatos aceitos
-        const hasValidExtension = this.config.ANALYZER_EXTENSIONS.some(ext => 
-          fileName.endsWith(ext)
-        );
-
-        // Ignora a entrada atual se ela for uma pasta ou possuir formato inválido
-        if (!hasValidExtension) {
-          // Pula imediatamente para a próxima iteração
-          continue;
-        }
-
-        // Calcula a profundidade de subpastas contando os separadores de diretório
-        const depth = normalizedPath.split('/').length - 1;
-
-        // Compara a profundidade da pasta atual com o limite máximo estabelecido
-        if (depth > this.config.MAX_ROUTE_DEPTH) {
-          // Descarta o arquivo se ele estiver muito profundo na árvore
-          continue;
-        }
-
-        // Verifica se o nome do arquivo ativa alguma regra de exclusão
-        // O array IGNORE_PATTERNS contém expressões regulares de filtragem
-        const isIgnored = this.config.IGNORE_PATTERNS?.some(pattern => 
-          pattern.test(fileName)
-        );
-
-        // Bloqueia o processamento caso o arquivo combine com as exclusões
-        if (isIgnored) {
-          // Descarta a entrada atual e avança
-          continue;
-        }
-
-        // Constrói o caminho completo unindo a raiz ao caminho relativo validado
-        files.push(path.join(dirPath, rawPath));
-      }
-
-      // Retorna a lista final de caminhos descobertos para o loader
-      return files;
-
-    } catch (error) {
-      // Registra o erro no sistema de logs da interface do cliente
-      this.client.LOG_ERR(
-        `Analyzer discovery error in ${dirPath}: ${error}`, 
-        this.name
-      );
-      // Retorna uma lista vazia para impedir a interrupção abrupta da execução
-      return [];
-    }
-  }
-  /**
-   * Registers analyzers in parallel with detailed tracking
-   * 
-   * @private
-   * @param {string[]} files - List of analyzer file paths
-   * @returns {Promise<{
-   *   successful: string[], 
-   *   failed: string[]
-   * }>} Registration results
-   */
-  private async registerAnalyzer(files: string[]): Promise<{
+  private async registerAnalyzers(classes: any[]): Promise<{
     successful: string[];
     failed: string[];
   }> {
+    // Processa a validação e instanciação de todas as classes ao mesmo tempo
     const registrationResults = await Promise.all(
-      files.map(file => this.registerSingleAnalyzer(file))
+      classes.map(AnalyzerClass => this.registerSingleAnalyzer(AnalyzerClass))
     );
 
+    // Constrói e retorna um objeto dividindo os aprovados dos reprovados
     return {
+      // Filtra e mapeia apenas os analisadores que retornaram sucesso
       successful: registrationResults
         .filter(result => result.success)
-        .map(result => result.file),
+        .map(result => result.className),
+      // Filtra e mapeia apenas os analisadores que falharam na validação
       failed: registrationResults
         .filter(result => !result.success)
-        .map(result => result.file)
+        .map(result => result.className)
     };
   }
 
   /**
-   * Registers a single analyzer with granular error handling, extracting the class from ES Modules.
-   * 
-   * A linha de raciocínio resolve o desempacotamento de Módulos ES (ES Modules) durante 
-   * a importação dinâmica. A função extrai a exportação padrão (`default`) ou cai na 
-   * primeira exportação nomeada caso o `default` esteja ausente, garantindo que o 
-   * artefato validado seja de fato a classe do analisador.
+   * Valida a estrutura e instancia uma classe única de analisador.
    * 
    * @private
-   * @param {string} file Caminho do arquivo do analisador.
-   * @returns {Promise<{file: string, success: boolean, error?: Error}>} Resultado do registro.
+   * @param {any} AnalyzerClass A classe do analisador extraída do registro.
+   * @returns {Promise<{className: string, success: boolean, error?: Error}>} Resultado do registro.
    */
-  private async registerSingleAnalyzer(file: string): Promise<{
-    file: string;
+  private async registerSingleAnalyzer(AnalyzerClass: any): Promise<{
+    className: string;
     success: boolean;
     error?: Error;
   }> {
-    try {
-      // Resolve o caminho absoluto do arquivo para garantir a leitura correta
-      const analyzerPath = path.resolve(file);
-      
-      // Importa dinamicamente o módulo do sistema de arquivos virtual
-      const analyzerModule = await import(analyzerPath);
-      
-      // Extrai a classe priorizando a exportação padrão (export default)
-      // Se não houver default, extrai o primeiro valor exportado do módulo
-      const AnalyzerClass = analyzerModule.default || Object.values(analyzerModule)[0];
+    // Tenta ler o nome da classe ou assume 'UnknownClass' como precaução
+    const className = AnalyzerClass?.name || 'UnknownClass';
 
-      // Valida se o artefato extraído obedece à estrutura de classe esperada
+    try {
+      // Rejeita a classe imediatamente se ela não passar no teste estrutural
       if (!this.validateAnalyzerClass(AnalyzerClass)) {
         throw new Error('Invalid analyzer class structure');
       }
 
-      // Cria uma nova instância do analisador injetando a interface do cliente
+      // Cria a instância injetando o contexto do cliente no construtor
       const analyzerInstance = new AnalyzerClass(this.client);
       
-      // Armazena a instância validada no array principal do cliente
+      // Adiciona o analisador pronto na lista global da aplicação
       this.client.analyzers.push(analyzerInstance);
 
-      // Registra o sucesso da operação nos logs do sistema
+      // Sinaliza o registro bem-sucedido no console de logs
       this.client.LOG(`Analyzer registered: ${analyzerInstance.name}`, this.name);
 
-      // Retorna sucesso para o orquestrador de carregamento
-      return { file, success: true };
+      // Retorna a confirmação de sucesso isolada
+      return { className, success: true };
     } catch (error) {
-      // Registra a falha específica deste arquivo nos logs de erro
+      // Grava o erro específico desta classe sem derrubar as demais
       this.client.LOG_ERR(
-        `Analyzer registration failed for ${file}: ${error}`, 
+        `Analyzer registration failed for ${className}: ${error}`, 
         this.name
       );
       
-      // Retorna a falha isolada sem quebrar o processamento de outros arquivos
+      // Retorna a falha documentada para as métricas finais
       return { 
-        file, 
+        className, 
         success: false, 
         error: error instanceof Error ? error : new Error(String(error)) 
       };
     }
   }
+
   /**
-   * Validates the structure of a analyzer class
+   * Valida se a estrutura da classe atende aos requisitos mínimos.
    * 
    * @private
-   * @param {any} AnalyzerClass - Analyzer class to validate
-   * @returns {boolean} Whether the analyzer class is valid
+   * @param {any} AnalyzerClass A classe para validação.
+   * @returns {boolean} Se a classe possui estrutura válida.
    */
-    private validateAnalyzerClass(AnalyzerClass: any): boolean {
-    // Retorna verdadeiro se for uma função e possuir um protótipo definido
-    // Isso garante que o artefato pode ser instanciado com a palavra-chave 'new'
+  private validateAnalyzerClass(AnalyzerClass: any): boolean {
+    // Confirma via Duck Typing se o objeto pode atuar como uma classe construtora (new)
     return (
       typeof AnalyzerClass === 'function' && 
       AnalyzerClass.prototype !== undefined
@@ -332,18 +192,20 @@ export default class AnalyzerLoader {
   }
 
   /**
-   * Centralized error management for analyzer loading
+   * Gerenciamento centralizado de erros para o processo de carregamento.
    * 
    * @private
-   * @param {unknown} error - Error object or message
-   * @description Logs critical errors during analyzer loading
+   * @param {unknown} error O objeto de erro capturado.
+   * @description Registra falhas críticas que quebram o ciclo de carregamento.
    */
   private handleLoadError(error: unknown): void {
+    // Monta um contexto estruturado com o horário e a mensagem do erro
     const errorContext = {
       timestamp: new Date().toISOString(),
       message: error instanceof Error ? error.message : String(error)
     };
 
+    // Dispara o alerta máximo bloqueando a execução posterior do compilador
     this.client.LOG_ERR(
       `Critical analyzer loading failure: ${JSON.stringify(errorContext)}`, 
       this.name,
