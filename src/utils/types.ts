@@ -160,9 +160,18 @@ export interface NoDeclaracaoWhile extends BaseNode {
   corpo: NoBloco;
 }
 
+export interface NoDeclaracaoFor extends BaseNode {
+  tipo: "DeclaracaoFor";
+  inicializacao: NoDeclaracaoVariavel | NoExpressaoStatement | null;
+  condicao: NoExpressao | null;
+  atualizacao: NoExpressao | null;
+  corpo: NoBloco;
+}
+
 export interface NoReturnStatement extends BaseNode {
   tipo: "ReturnStatement";
   argumento: NoExpressao | null;
+  tipoInferido?: TipoSemantico;
 }
 export interface NoBreakStatement extends BaseNode {
   tipo: "BreakStatement";
@@ -180,4 +189,5 @@ export type NoStatement =
   | NoReturnStatement
   | NoBreakStatement
   | NoContinueStatement
-  | NoDeclaracaoWhile;
+  | NoDeclaracaoWhile
+  | NoDeclaracaoFor;
