@@ -37,6 +37,9 @@ jobs:
       - name: Instalar dependências
         run: bun install
 
+      - name: Gerar dependências dinâmicas
+        run: bun run scripts/generate-registry.ts
+
       - name: Compilar o executável
         run: bun run build.ts
         env:

@@ -9,8 +9,10 @@
   },
   "scripts": {
     "docs": "typedoc",
-    "start": "bun run src/index.ts",
-    "test": "bun test"
+    "start": "bun prebuild && bun run src/index.ts",
+    "test": "bun test",
+    "prebuild": "bun run src/scripts/generate-registry.ts",
+    "build": "bun run build.ts"
   },
   "repository": {
     "type": "git",
