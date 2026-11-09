@@ -12,7 +12,7 @@
     "start": "bun prebuild && bun run src/index.ts",
     "test": "bun test",
     "prebuild": "bun run src/scripts/generate-registry.ts",
-    "build": "bun run build.ts"
+    "build-comp": "bun prebuild && bun run build.ts"
   },
   "repository": {
     "type": "git",
