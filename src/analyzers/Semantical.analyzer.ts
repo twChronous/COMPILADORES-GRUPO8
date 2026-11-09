@@ -294,18 +294,19 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
   }
 
   /**
-   * Garante que o retorno é válido e só ocorre dentro de funções.
+   * Verifica se o return está dentro de uma função
+   * e registra o tipo inferido do valor retornado.
    */
   private verificarReturn(no: NoReturnStatement): void {
     if (this.nivelFuncao === 0) {
-      throw new Error(`Erro Semântico [Linha ${no.linha}]: 'return' só pode ser usado dentro do corpo de uma função.`);
+      throw new Error(
+        `Erro Semântico [Linha ${no.linha}]: 'return' só pode ser usado dentro do corpo de uma função.`
+      );
     }
 
-    if (no.argumento) {
-      // Apenas aciona a validação da expressão para garantir 
-      // que nenhuma variável não declarada está sendo retornada
-      this.tipoDaExpressao(no.argumento);
-    }
+    no.tipoInferido = no.argumento
+      ? this.tipoDaExpressao(no.argumento)
+      : "void";
   }
 
  

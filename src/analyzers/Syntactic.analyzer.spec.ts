@@ -225,4 +225,113 @@ describe("SyntacticAnalyzer", () => {
       valorInicial: { tipo: "Literal", valor: "10" }
     });
   });
+   //teste_Paulo
+  test("deve reconhecer função sem parâmetros", () => {
+    const { ast, sucesso, erros } =
+      analisarCodigo("function teste() {}");
+
+    expect(sucesso).toBe(true);
+    expect(erros).toHaveLength(0);
+
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      nome: "teste",
+      parametros: [],
+      corpo: {
+        tipo: "Bloco",
+        corpo: []
+      }
+    });
+  });
+
+  test("deve reconhecer função com múltiplos parâmetros e retorno", () => {
+    const { ast, sucesso } = analisarCodigo(
+      "function soma(a, b) { return a + b; }"
+    );
+
+    expect(sucesso).toBe(true);
+
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      nome: "soma",
+      parametros: [
+        { tipo: "Parametro", nome: "a" },
+        { tipo: "Parametro", nome: "b" }
+      ],
+      corpo: {
+        tipo: "Bloco",
+        corpo: [
+          {
+            tipo: "ReturnStatement",
+            argumento: {
+              tipo: "ExpressaoBinaria",
+              operador: "+",
+              esquerda: {
+                tipo: "Identificador",
+                nome: "a"
+              },
+              direita: {
+                tipo: "Identificador",
+                nome: "b"
+              }
+            }
+          }
+        ]
+      }
+    });
+  });
+
+  test("deve reconhecer return sem expressão", () => {
+    const { ast, sucesso } = analisarCodigo(
+      "function sair() { return; }"
+    );
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      corpo: {
+        corpo: [
+          {
+            tipo: "ReturnStatement",
+            argumento: null
+          }
+        ]
+      }
+    });
+  });
+
+  test("deve reconhecer retorno dentro de if", () => {
+    const { ast, sucesso } = analisarCodigo(
+      "function positivo(x) { if (x > 0) { return true; } return false; }"
+    );
+
+    expect(sucesso).toBe(true);
+
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFuncao",
+      corpo: {
+        corpo: [
+          { tipo: "DeclaracaoIf" },
+          {
+            tipo: "ReturnStatement",
+            argumento: {
+              tipo: "Literal",
+              valor: "false"
+            }
+          }
+        ]
+      }
+    });
+  });
+
+  test("deve rejeitar parâmetro inválido na função", () => {
+    const { sucesso, erros } = analisarCodigo(
+      "function soma(123) { return 1; }"
+    );
+
+    expect(sucesso).toBe(false);
+    expect(erros?.length).toBeGreaterThan(0);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
 });

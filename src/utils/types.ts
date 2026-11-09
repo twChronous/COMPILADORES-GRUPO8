@@ -171,6 +171,7 @@ export interface NoDeclaracaoFor extends BaseNode {
 export interface NoReturnStatement extends BaseNode {
   tipo: "ReturnStatement";
   argumento: NoExpressao | null;
+  tipoInferido?: TipoSemantico;
 }
 export interface NoBreakStatement extends BaseNode {
   tipo: "BreakStatement";
