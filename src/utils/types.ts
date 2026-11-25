@@ -30,6 +30,11 @@ export interface AnalyzerModelOptions {
   name: string;
   description: string;
 }
+export interface GeneratorModelOptions {
+  name: string;
+  output: string;
+  description: string;
+}
 
 export interface LoaderInitConfig {
   maxFailureThreshold?: number;
