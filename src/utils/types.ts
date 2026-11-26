@@ -1,9 +1,11 @@
 export interface ClientInterface {
   tokens: lexicTokens[];
   analyzers: AnalyzerModelOptions[];
+  generators?: GeneratorModelOptions[];
   ast?: NoStatement[];
   tabelaSimbolos?: Simbolo[];
   errosSintaticos?: string[];
+  codigoGerado?: string;
   LOG(...args: string[]): void;
   LOG_ERR(...args: string[]): void;
   LOG_WARN(...args: string[]): void;

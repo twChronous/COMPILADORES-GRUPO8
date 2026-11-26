@@ -1,18 +1,52 @@
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import Compiler from "./Compiler";
 
 // Extrai os argumentos repassados via linha de comando
 const args = process.argv.slice(2);
 
-// Mapeia as flags booleanas
+/**
+ * Extrai o caminho do arquivo de saída (--out / -o) e os índices de argumentos consumidos.
+ */
+function extrairOpcoesSaida(listaArgs: string[]): {
+  arquivoSaida?: string;
+  indicesConsumidos: Set<number>;
+} {
+  const indicesConsumidos = new Set<number>();
+  let arquivoSaida: string | undefined;
+
+  for (let i = 0; i < listaArgs.length; i++) {
+    const arg = listaArgs[i];
+    if (arg === "--out" || arg === "-o") {
+      indicesConsumidos.add(i);
+      if (i + 1 < listaArgs.length && !listaArgs[i + 1].startsWith("-")) {
+        arquivoSaida = listaArgs[i + 1];
+        indicesConsumidos.add(i + 1);
+      }
+    } else if (arg.startsWith("--out=")) {
+      arquivoSaida = arg.slice("--out=".length);
+      indicesConsumidos.add(i);
+    } else if (arg.startsWith("-o=")) {
+      arquivoSaida = arg.slice("-o=".length);
+      indicesConsumidos.add(i);
+    }
+  }
+
+  return { arquivoSaida, indicesConsumidos };
+}
+
+// Mapeia as flags booleanas e argumentos de entrada/saída
 const help = args.includes("--help") || args.includes("-h");
 const verbose = args.includes("--verbose");
 const showAst = args.includes("--ast");
 const showTokens = args.includes("--tokens");
 const showTS = args.includes("--ts");
+const showGo = args.includes("--go");
+const { arquivoSaida, indicesConsumidos } = extrairOpcoesSaida(args);
 
-// O arquivo fonte será o primeiro argumento que não começa com um traço "--"
-const arquivoFonte = args.find(arg => !arg.startsWith("--"));
+// O arquivo fonte será o primeiro argumento posicional não consumido por flags
+const arquivoFonte = args.find(
+  (arg, indice) => !arg.startsWith("-") && !indicesConsumidos.has(indice)
+);
 
 // Intercepta a execução se a flag de ajuda for chamada
 if (help) {
@@ -20,24 +54,28 @@ if (help) {
 Uso: run src/index.ts [arquivo.js] [opcoes]
 
 Opções:
-  -h, --help     Exibe esta tela de ajuda e encerra a execução.
-  --verbose      Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
-  --ast          Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
-  --tokens       Imprime a entrada em tokens final no terminal.
-  --ts           Imprime a tabela de simbolos no terminal.
+  -h, --help          Exibe esta tela de ajuda e encerra a execução.
+  --verbose           Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
+  --ast               Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
+  --tokens            Imprime a entrada em tokens final no terminal.
+  --ts                Imprime a tabela de simbolos no terminal.
+  --go                Imprime o codigo Go gerado no terminal.
+  -o, --out <arquivo> Salva o codigo Go gerado no arquivo especificado.
 
 Exemplos de uso:
   run src/index.ts teste.js
   run src/index.ts teste.js --verbose
   run src/index.ts teste.js --tokens
   run src/index.ts teste.js --ts
+  run src/index.ts teste.js --go
+  run src/index.ts teste.js --out saida.go
   run src/index.ts teste.js --ast --verbose
   run src/index.ts teste.js --tokens --ast --verbose
   `);
   process.exit(0);
 }
 async function run() {
-  const compiler = new Compiler({ verbose, showAst, showTokens });
+  const compiler = new Compiler({ verbose, showAst, showTokens, showGo });
   let input = "";
 
   if (arquivoFonte) {
@@ -92,6 +130,17 @@ async function run() {
       );
     console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
     console.log(JSON.stringify(tabela_filtrada, null, 2));
+  }
+
+  if (sucesso && compiler.codigoGerado) {
+    if (arquivoSaida) {
+      writeFileSync(arquivoSaida, compiler.codigoGerado, "utf-8");
+      console.log(`\x1b[32m[INFO]\x1b[0m Código Go salvo em '${arquivoSaida}'.`);
+    }
+    if (showGo || (!arquivoSaida && !showAst && !showTokens && !showTS)) {
+      console.log("\n\x1b[35m=== CODIGO GO GERADO ===\x1b[0m");
+      console.log(compiler.codigoGerado);
+    }
   }
   // Define um código de saída apropriado para ferramentas de CI/CD
   if (!sucesso) {

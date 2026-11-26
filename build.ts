@@ -31,12 +31,15 @@ async function buildCli(): Promise<void> {
       autoloadDotenv: false,
       // Bloqueia a leitura automática do arquivo de configuração do bun
       autoloadBunfig: false,
-      // Embute a pasta de analisadores na memória virtual do binário (VFS)
+      // Embute as pastas de analisadores e geradores na memória virtual do binário (VFS)
       assets: [
         "src/analyzers",
         "src/analyzers/Lexycal.analyzer.ts",
         "src/analyzers/Syntactic.analyzer.ts",
         "src/analyzers/Semantical.analyzer.ts",
+        "src/generators",
+        "src/generators/go.generator.ts",
+        "src/generators/ir.generator.ts",
       ]
     },
     // Comprime o código para reduzir o tamanho do arquivo

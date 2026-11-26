@@ -20,29 +20,38 @@ export default class GeneratorModel {
     public name: string;
 
     /** 
+     * Formato ou linguagem de saída do gerador (ex: "go", "ir")
+     * @type {string}
+     */
+    public output: string;
+
+    /** 
      * Descrição detalhada da funcionalidade do gerador
      * @type {string}
      */
     public description: string;
 
     /**
-     * Construtor da classe RoutesModel
+     * Construtor da classe GeneratorModel
      * 
      * @param {ClientInterface} client - Instância do cliente com recursos do sistema
      * @param {GeneratorModelOptions} options - Opções de configuração do gerador
      * @param {string} [options.name="Sem Nome"] - Nome do gerador (padrão: "Sem Nome")
+     * @param {string} [options.output=""] - Formato de saída do gerador (padrão: "")
      * @param {string} [options.description="Nenhuma"] - Descrição do gerador (padrão: "Nenhuma")
      */
     constructor(
         client: ClientInterface, 
         { 
             name = "Sem Nome", 
+            output = "",
             description = "Nenhuma" 
         }: GeneratorModelOptions
     ) {
         // Inicializa as propriedades da classe com os valores fornecidos
         this.client = client;
         this.name = name;
+        this.output = output;
         this.description = description;
     }
   
