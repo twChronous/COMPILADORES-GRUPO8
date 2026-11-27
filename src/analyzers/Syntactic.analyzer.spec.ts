@@ -45,6 +45,70 @@ describe("SyntacticAnalyzer", () => {
     });
   });
 
+  test("chamadas de função e acesso a membro: gera ChamadaFuncao e AcessoMembro", () => {
+    const { ast, sucesso, erros } = analisarCodigo(
+      "console.log(soma(1, 2+ 3)); obj.metodo().prop;"
+    );
+    expect(sucesso).toBe(true);
+    expect(erros).toHaveLength(0);
+
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        tipo: "ChamadaFuncao",
+        callee: {
+          tipo: "AcessoMembro",
+          propriedade: "log",
+          objeto: { tipo: "Identificador", nome: "console" },
+        },
+        argumentos: [
+          {
+            tipo: "ChamadaFuncao",
+            callee: { tipo: "Identificador", nome: "soma" },
+            argumentos: [
+              { tipo: "Literal", valor: "1" },
+              { tipo: "ExpressaoBinaria", operador: "+" },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  test("erros de sintaxe: chamada inciompleta, while vazio e função sem nome", () => {
+    const chamadaInvalida = analisarCodigo("soma(1, );");
+    expect(chamadaInvalida.sucesso).toBe(false);
+    expect(chamadaInvalida.erros?.[0]).toMatch(/Erro de Sintaxe/);
+
+    const whileVazio = analisarCodigo("while () { x = 1; }");
+    expect(whileVazio.sucesso).toBe(false);
+    expect(whileVazio.erros?.[0]).toMatch(/Erro de Sintaxe/);
+
+    const funcaoSemNome = analisarCodigo("function () { return 1; }");
+    expect(funcaoSemNome.sucesso).toBe(false);
+    expect(funcaoSemNome.erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
+  test("atribuição: associa da direita para a esquerda (x = y = 1)", () => {
+    const { ast, sucesso } = analisarCodigo("x = y = 1;");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        tipo: "ExpressaoBinaria",
+        operador: "=",
+        esquerda: { tipo: "Identificador", nome: "x" },
+        direita: {
+          tipo: "ExpressaoBinaria",
+          operador: "=",
+          esquerda: { tipo: "Identificador", nome: "y" },
+          direita: { tipo: "Literal", valor: "1" },
+        },
+      },
+    });
+  });
+
   test("deve respeitar a precedência matemática (multiplicação antes da adição)", () => {
     const { ast, sucesso } = analisarCodigo("resultado = 2 + 3 * 4;");
 
