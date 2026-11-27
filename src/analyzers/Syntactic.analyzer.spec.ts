@@ -129,6 +129,83 @@ describe("SyntacticAnalyzer", () => {
     expect(ast?.[1].tipo).toBe("DeclaracaoVariavel");
   });
 
+  test("for: deve reconhecer a forma clássica com declaração, condição e atualização", () => {
+    const { ast, sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1) { x = i; }");
+
+    expect(sucesso).toBe(true);
+    expect(erros).toHaveLength(0);
+    expect(ast).toHaveLength(1);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: {
+        tipo: "DeclaracaoVariavel",
+        modificador: "let",
+        nome: "i",
+        valorInicial: { tipo: "Literal", valor: "0" }
+      },
+      condicao: {
+        tipo: "ExpressaoBinaria",
+        operador: "<",
+        esquerda: { tipo: "Identificador", nome: "i" },
+        direita: { tipo: "Literal", valor: "3" }
+      },
+      atualizacao: {
+        tipo: "ExpressaoBinaria",
+        operador: "+=",
+        esquerda: { tipo: "Identificador", nome: "i" },
+        direita: { tipo: "Literal", valor: "1" }
+      },
+      corpo: {
+        tipo: "Bloco",
+        corpo: [{ tipo: "ExpressaoStatement" }]
+      }
+    });
+  });
+
+  test("for: inicialização pode ser uma expressão de atribuição", () => {
+    const { ast, sucesso } = analisarCodigo("for (i = 0; i < 3; i += 1) { }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: { tipo: "ExpressaoStatement", expressao: { operador: "=" } }
+    });
+  });
+
+  test("for: as três partes podem ser omitidas (for (;;))", () => {
+    const { ast, sucesso } = analisarCodigo("for (;;) { break; }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoFor",
+      inicializacao: null,
+      condicao: null,
+      atualizacao: null,
+      corpo: { corpo: [{ tipo: "BreakStatement" }] }
+    });
+  });
+
+  test("for: falta de ';' após a inicialização gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0 i < 3; i += 1) { }");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Erro de Sintaxe/);
+  });
+
+  test("for: falta de ')' gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1 { }");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Esperado '\)'/);
+  });
+
+  test("for: sem bloco '{' gera erro de sintaxe", () => {
+    const { sucesso, erros } = analisarCodigo("for (let i = 0; i < 3; i += 1) x = 1;");
+
+    expect(sucesso).toBe(false);
+    expect(erros?.[0]).toMatch(/Esperado '\{'/);
+  });
+
   test("Panic Mode: deve recuperar-se de um erro de sintaxe e continuar a análise", () => {
     // A primeira instrução tem um erro (faltando valor após o '='), a segunda é válida
     const { ast, sucesso, erros } = analisarCodigo("let falho = ; let correto = 10;");
@@ -146,6 +223,105 @@ describe("SyntacticAnalyzer", () => {
       tipo: "DeclaracaoVariavel",
       nome: "correto",
       valorInicial: { tipo: "Literal", valor: "10" }
+    }); 
+  });
+    test("precedência: && fica na raiz de 'a >= 0 && b != 3'", () => {
+    const { ast, sucesso } = analisarCodigo("a >= 0 && b != 3;");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "ExpressaoStatement",
+      expressao: {
+        operador: "&&",
+        esquerda: { operador: ">=" },
+        direita: { operador: "!=" }
+      }
+    });
+  });
+
+  test("precedência: && liga mais forte que || (a || b && c)", () => {
+    const { ast } = analisarCodigo("a || b && c;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: "||",
+        esquerda: { tipo: "Identificador", nome: "a" },
+        direita: { operador: "&&" }
+      }
+    });
+  });
+
+  test("precedência: a && b || c agrupa o && à esquerda", () => {
+    const { ast } = analisarCodigo("a && b || c;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: "||",
+        esquerda: { operador: "&&" },
+        direita: { tipo: "Identificador", nome: "c" }
+      }
+    });
+  });
+
+  test("precedência: relacional liga mais forte que igualdade (a == b < c)", () => {
+    const { ast } = analisarCodigo("a == b < c;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: "==",
+        esquerda: { nome: "a" },
+        direita: { operador: "<" }
+      }
+    });
+  });
+
+  test("precedência: aritmética liga mais forte que relacional (a + 1 > b)", () => {
+    const { ast } = analisarCodigo("a + 1 > b;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: ">",
+        esquerda: { operador: "+" },
+        direita: { nome: "b" }
+      }
+    });
+  });
+
+  test("associatividade à esquerda: a && b && c", () => {
+    const { ast } = analisarCodigo("a && b && c;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: "&&",
+        esquerda: { operador: "&&" },
+        direita: { nome: "c" }
+      }
+    });
+  });
+
+  test("parênteses sobrescrevem a precedência: (a || b) && c", () => {
+    const { ast } = analisarCodigo("(a || b) && c;");
+
+    expect(ast?.[0]).toMatchObject({
+      expressao: {
+        operador: "&&",
+        esquerda: { operador: "||" },
+        direita: { nome: "c" }
+      }
+    });
+  });
+
+  test("while: condição com && e != gera a AST correta", () => {
+    const { ast, sucesso } = analisarCodigo("while (a >= 0 && b != 3) { a -= 1; }");
+
+    expect(sucesso).toBe(true);
+    expect(ast?.[0]).toMatchObject({
+      tipo: "DeclaracaoWhile",
+      condicao: {
+        operador: "&&",
+        esquerda: { operador: ">=" },
+        direita: { operador: "!=" }
+      }
     });
   });
    //teste_Paulo

@@ -13,7 +13,9 @@ import {
   NoReturnStatement,
   NoDeclaracaoFuncao,
   NoBreakStatement,
-  NoContinueStatement
+  NoContinueStatement,
+  NoDeclaracaoWhile,
+  NoDeclaracaoFor
 } from "../utils/types";
 
 
@@ -87,7 +89,9 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     this.escopos = [escopoGlobal];
     this.registroSimbolos = Array.from(escopoGlobal.values()); // Adiciona os nativos ao registro final
     this.contadorEscopo = 0;
-    
+    this.nivelFuncao = 0;
+    this.nivelLoop = 0;
+
     return corpo.map((statement) => this.verificarStatement(statement));
   }
 
@@ -132,8 +136,66 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
     else if (statement.tipo === "DeclaracaoFuncao") this.verificarDeclaracaoFuncao(statement);
     else if (statement.tipo === "ReturnStatement") this.verificarReturn(statement);
     else if (statement.tipo === "BreakStatement") this.verificarBreak(statement);       
-    else if (statement.tipo === "ContinueStatement") this.verificarContinue(statement); 
+    else if (statement.tipo === "ContinueStatement") this.verificarContinue(statement);
+    else if (statement.tipo === "DeclaracaoWhile") this.verificarWhile(statement);
+    else if (statement.tipo === "DeclaracaoFor") this.verificarFor(statement);
+    else {
+      const desconhecido = statement as NoStatement;
+      throw new Error(`Erro Semântico [Linha ${desconhecido.linha}]: Comando '${desconhecido.tipo}' não suportado pelo analisador semântico.`);
+    }
     return statement;
+  }
+
+  /**
+   * Garante que a condição de um `if`, `while` ou `for` é booleana.
+   * O tipo `any` (parâmetros de função e retornos de chamadas) é aceito,
+   * pois não é possível provar o tipo em tempo de compilação.
+   *
+   * @param condicao A expressão da condição.
+   * @param estrutura O nome da estrutura (usado na mensagem de erro).
+   * @param linha A linha da estrutura.
+   * @throws Lança um erro se o tipo da condição não for `boolean` nem `any`.
+   */
+  private verificarCondicao(condicao: NoExpressao, estrutura: "if" | "while" | "for", linha: number): void {
+    const tipoCondicao = this.tipoDaExpressao(condicao);
+    if (tipoCondicao !== "boolean" && tipoCondicao !== "any") {
+      throw new Error(`Erro Semântico [Linha ${linha}]: A condição do '${estrutura}' deve ser boolean, encontrado '${tipoCondicao}'.`);
+    }
+  }
+
+  /**
+   * Verifica um laço `while`: condição booleana e corpo dentro de um contexto de laço
+   * (permite `break` e `continue`).
+   *
+   * @param no O nó da declaração `while`.
+   */
+  private verificarWhile(no: NoDeclaracaoWhile): void {
+    this.verificarCondicao(no.condicao, "while", no.linha);
+    this.nivelLoop++;
+    this.verificarBloco(no.corpo);
+    this.nivelLoop--;
+  }
+
+  /**
+   * Verifica um laço `for`.
+   * O laço cria um escopo próprio: a variável declarada na inicialização existe
+   * apenas dentro do `for` (condição, atualização e corpo) e não vaza para fora.
+   *
+   * @param no O nó da declaração `for`.
+   */
+  private verificarFor(no: NoDeclaracaoFor): void {
+    this.contadorEscopo++;
+    this.escopos.push(new Map());
+
+    if (no.inicializacao) this.verificarStatement(no.inicializacao);
+    if (no.condicao) this.verificarCondicao(no.condicao, "for", no.linha);
+    if (no.atualizacao) this.tipoDaExpressao(no.atualizacao);
+
+    this.nivelLoop++;
+    this.verificarBloco(no.corpo);
+    this.nivelLoop--;
+
+    this.escopos.pop();
   }
 
   /**
@@ -159,10 +221,7 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
    * @throws Lança um erro se a condição não for do tipo booleano.
    */
   private verificarIf(no: NoDeclaracaoIf): NoDeclaracaoIf {
-    const tipoCondicao = this.tipoDaExpressao(no.condicao);
-    if (tipoCondicao !== "boolean") {
-      throw new Error(`Erro Semântico [Linha ${no.linha}]: A condição do 'if' deve ser boolean, encontrado '${tipoCondicao}'.`);
-    }
+    this.verificarCondicao(no.condicao, "if", no.linha);
     this.verificarBloco(no.consequencia);
     if (no.alternativa) this.verificarBloco(no.alternativa);
     return no;
@@ -221,11 +280,15 @@ export default class SemanticalAnalyzer extends AnalyzerModel {
       this.declarar(param.nome, "let", "any", param.linha); 
     });
 
+    // Um 'break'/'continue' dentro de uma função não pode usar o laço que a envolve.
+    const nivelLoopExterno = this.nivelLoop;
+    this.nivelLoop = 0;
     this.nivelFuncao++;
     for (const stmt of no.corpo.corpo) {
       this.verificarStatement(stmt);
     }
     this.nivelFuncao--;
+    this.nivelLoop = nivelLoopExterno;
 
     this.escopos.pop();
   }

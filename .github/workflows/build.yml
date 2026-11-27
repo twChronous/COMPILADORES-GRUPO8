@@ -1,0 +1,70 @@
+name: Release
+
+# O fluxo roda sempre que uma tag de versão for criada (ex: git tag v1.0.0)
+on:
+  push:
+    tags: ["v*"]
+
+# Concede permissão de escrita para o bot do GitHub poder criar a aba de Release
+permissions:
+  contents: write
+
+jobs:
+  # 1º JOB: Compila os binários em paralelo
+  build:
+    name: Build para ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - target: bun-linux-x64
+            artifact: compilador-linux
+          - target: bun-windows-x64
+            artifact: compilador-windows.exe
+          - target: bun-darwin-x64
+            artifact: compilador-macos-intel
+          - target: bun-darwin-arm64
+            artifact: compilador-macos-silicon
+
+    steps:
+      - name: Clonar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar o Bun
+        uses: oven-sh/setup-bun@v2
+        
+      - name: Instalar dependências
+        run: bun install
+
+      - name: Compilar o executável
+        run: bun build-comp
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_OUTFILE: ./dist/${{ matrix.artifact }}
+
+      - name: Fazer o upload temporário do artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ./dist/${{ matrix.artifact }}
+          retention-days: 1 # O arquivo temporário será apagado em 1 dia
+
+  # 2º JOB: Reúne tudo e publica a Release oficial
+  release:
+    name: Criar Release
+    needs: build # Garante que este job só rode após todos os builds terminarem
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Baixar todos os artefatos compilados
+        uses: actions/download-artifact@v4
+        with:
+          path: ./binaries
+          merge-multiple: true # Junta todos os arquivos baixados na mesma pasta
+
+      - name: Publicar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./binaries/* # Anexa todos os executáveis
+          generate_release_notes: true # Cria notas de atualização automáticas baseadas nos commits
