@@ -1,4 +1,5 @@
 import GeneratorModel from "../models/Generator.model";
+import InferenciaTiposGo from "./go.inference";
 
 import {
   MAPA_TIPOS_GO,
@@ -28,6 +29,8 @@ import {
  */
 export default class GoGenerator extends GeneratorModel {
   private imports: Set<string> = new Set();
+  // Deduz os tipos Go de parâmetros, retornos e variáveis (o semântico só devolve `any` para eles). 
+  private readonly inferencia = new InferenciaTiposGo();
 
   private readonly formatadoresLiteral: Record<NoLiteral["tipoDado"], (valor: string) => string> = {
     NUMERO: (valor) => valor,
@@ -112,6 +115,8 @@ export default class GoGenerator extends GeneratorModel {
    */
   public gerar(corpo: NoStatement[]): string {
     this.imports = new Set();
+
+    this.inferencia.analisar(corpo);
 
     const funcoesTopo: string[] = [];
     const comandosMain: string[] = [];
@@ -226,7 +231,7 @@ export default class GoGenerator extends GeneratorModel {
    */
   private gerarDeclaracaoVariavel(no: NoDeclaracaoVariavel, nivel: number): string {
     const indent = this.indentar(nivel);
-    const tipo = no.tipoInferido ?? this.inferirTipoExpressao(no.valorInicial);
+    const tipo = this.inferencia.tipoDoNo(no) ?? no.tipoInferido ?? this.inferirTipoExpressao(no.valorInicial);    
     const tipoGo = this.mapearTipo(tipo);
     const valor = this.gerarExpressao(no.valorInicial);
     const podeSerConst = no.modificador === "const" && tipoGo !== "any";
@@ -243,7 +248,9 @@ export default class GoGenerator extends GeneratorModel {
    * @returns Código completo da função em Go.
    */
   private gerarDeclaracaoFuncao(no: NoDeclaracaoFuncao): string {
-    const parametros = no.parametros.map((p) => `${p.nome} any`).join(", ");
+    const parametros = no.parametros
+      .map((p, i) => `${p.nome} ${this.mapearTipo(this.inferencia.tipoParametro(no.nome, i))}`)
+      .join(", ");
     const tipoRetorno = this.inferirRetornoFuncao(no.corpo);
     const assinaturaRetorno = tipoRetorno ? ` ${tipoRetorno}` : "";
     const linhasCorpo = no.corpo.corpo.map((stmt) => this.gerarStatement(stmt, 1));
@@ -279,7 +286,9 @@ export default class GoGenerator extends GeneratorModel {
 
     const tiposGo = new Set(
       retornos.map((ret) =>
-        this.mapearTipo(ret.tipoInferido ?? this.inferirTipoExpressao(ret.argumento!))
+        this.mapearTipo(
+          this.inferencia.tipoDoNo(ret) ?? ret.tipoInferido ?? this.inferirTipoExpressao(ret.argumento!)
+        )
       )
     );
 

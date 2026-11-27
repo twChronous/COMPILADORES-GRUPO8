@@ -345,19 +345,19 @@ describe("GoGenerator - expressões binárias e precedência", () => {
 });
 
 describe("GoGenerator - funções, retornos e chamadas", () => {
-  test("eleva funções para o topo do pacote com parâmetros any", () => {
+  test("eleva funções para o topo do pacote com parâmetros tipados pelas chamadas", () => {
     const gerador = new GoGenerator(cliente());
     const codigo = gerador.gerar([
       decl("let", "resultado", chamada(id("soma"), [num("1"), num("2")]), "any"),
       funcao("soma", ["a", "b"], [retorno(bin("+", id("a"), id("b")), "any")]),
     ]);
 
-    const idxFunc = codigo.indexOf("func soma(a any, b any) any");
+    const idxFunc = codigo.indexOf("func soma(a float64, b float64) float64");
     const idxMain = codigo.indexOf("func main()");
 
     expect(idxFunc).toBeGreaterThan(-1);
     expect(idxFunc).toBeLessThan(idxMain);
-    expect(codigo).toContain("\tvar resultado any = soma(1, 2)");
+    expect(codigo).toContain("\tvar resultado float64 = soma(1, 2)");
   });
 
   test("infere tipo de retorno float64, string, bool, any e vazio (void)", () => {
@@ -450,7 +450,7 @@ describe("GoGenerator - run() e pipeline completo", () => {
         "",
         'import "fmt"',
         "",
-        "func soma(a any, b any) any {",
+        "func soma(a float64, b float64) float64 {",
         "\treturn a + b",
         "}",
         "",
