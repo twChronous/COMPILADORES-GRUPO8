@@ -47,7 +47,7 @@ async function gerarRegistro(
   ].join("\n");
 
   await writeFile(registryPath, fileContent, "utf-8");
-  console.log(`[Gerador] Registro criado com sucesso. ${tsFiles.length} ${rotulo} vinculados.`);
+  //console.log(`[Gerador] Registro criado com sucesso. ${tsFiles.length} ${rotulo} vinculados.`);
 }
 
 /**
@@ -72,7 +72,7 @@ async function generateRegistries(): Promise<void> {
       ".generator.ts"
     );
   } catch (error) {
-    console.error(`[Gerador] Falha ao gerar registro dinâmico:`, error);
+    //console.error(`[Gerador] Falha ao gerar registro dinâmico:`, error);
     process.exit(1);
   }
 }

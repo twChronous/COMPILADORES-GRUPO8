@@ -1,267 +1,187 @@
-import { describe, expect, test } from "bun:test";
-import {
-  mkdtempSync,
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  rmSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join, resolve } from "path";
+import { parseCliArgs } from "./index";
 
-const raiz = resolve(import.meta.dir, "..");
+const CAMINHO_INDEX = resolve(import.meta.dir, "index.ts");
 
-function executarCLI(...args: string[]) {
-  const resultado = Bun.spawnSync({
-    cmd: [
-      process.execPath,
-      "run",
-      "src/index.ts",
-      ...args,
-    ],
-    cwd: raiz,
+function executarCli(args: string[], cwd: string) {
+  return Bun.spawnSync({
+    cmd: [process.execPath, "run", CAMINHO_INDEX, ...args],
+    cwd,
     stdout: "pipe",
     stderr: "pipe",
   });
-
-  return {
-    exitCode: resultado.exitCode,
-    stdout: resultado.stdout.toString(),
-    stderr: resultado.stderr.toString(),
-  };
 }
 
-function comPastaTemporaria(
-  executar: (pasta: string) => void
-) {
-  const pasta = mkdtempSync(
-    join(tmpdir(), "compilador-cli-")
-  );
-
-  try {
-    executar(pasta);
-  } finally {
-    rmSync(pasta, {
-      recursive: true,
-      force: true,
-    });
-  }
-}
-
-describe("CLI - geracao de arquivo Go (#71)", () => {
-  test("documenta a flag --output no help", () => {
-    const resultado = executarCLI("--help");
-
-    expect(resultado.exitCode).toBe(0);
-    expect(resultado.stdout).toContain("--output");
-  });
-
-  test("gera arquivo Go utilizando --output", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "entrada.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(
-        entrada,
-        "console.log(10 + 20);"
-      );
-
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
-
-      expect(resultado.exitCode).toBe(0);
-      expect(existsSync(saida)).toBe(true);
-
-      const codigoGo = readFileSync(saida, "utf-8");
-
-      expect(codigoGo).toContain("package main");
-      expect(codigoGo).toContain('import "fmt"');
-      expect(codigoGo).toContain("fmt.Println(10 + 20)");
+describe("CLI — parseCliArgs", () => {
+  test("sem argumentos mantém todas as flags desativadas e caminhos indefinidos", () => {
+    expect(parseCliArgs([])).toEqual({
+      help: false,
+      verbose: false,
+      showAst: false,
+      showTokens: false,
+      showTS: false,
+      showGo: false,
+      saveJson: false,
+      arquivoJson: undefined,
+      arquivoSaida: undefined,
+      arquivoFonte: undefined,
     });
   });
 
-  test("aceita --output antes do arquivo fonte", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "entrada.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(entrada, 'console.log("teste");');
-
-      const resultado = executarCLI(
-        "--output",
-        saida,
-        entrada
-      );
-
-      expect(resultado.exitCode).toBe(0);
-      expect(existsSync(saida)).toBe(true);
-    });
+  test("interpreta entrada .js e saída .go posicionais", () => {
+    const parsed = parseCliArgs(["entrada.js", "saida.go"]);
+    expect(parsed.arquivoFonte).toBe("entrada.js");
+    expect(parsed.arquivoSaida).toBe("saida.go");
   });
 
-  test("aceita --output com sinal de igual", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "entrada.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(entrada, "console.log(10);");
-
-      const resultado = executarCLI(
-        entrada,
-        `--output=${saida}`
-      );
-
-      expect(resultado.exitCode).toBe(0);
-      expect(existsSync(saida)).toBe(true);
-    });
+  test("interpreta apenas saída .go posicional sem arquivo fonte", () => {
+    const parsed = parseCliArgs(["saida.go"]);
+    expect(parsed.arquivoFonte).toBeUndefined();
+    expect(parsed.arquivoSaida).toBe("saida.go");
   });
 
-  for (const flag of ["--out", "-o"]) {
-    test(`preserva compatibilidade com ${flag}`, () => {
-      comPastaTemporaria(pasta => {
-        const entrada = join(pasta, "entrada.js");
-        const saida = join(pasta, "saida.go");
-
-        writeFileSync(entrada, "console.log(20);");
-
-        const resultado = executarCLI(
-          entrada,
-          flag,
-          saida
-        );
-
-        expect(resultado.exitCode).toBe(0);
-        expect(existsSync(saida)).toBe(true);
-      });
-    });
-  }
-
-  test("rejeita --output sem argumento", () => {
-    const resultado = executarCLI("--output");
-
-    expect(resultado.exitCode).toBe(1);
-    expect(resultado.stderr).toContain(
-      "exige um arquivo de saída"
-    );
+  test("suporta --output, --output=, --out e -o", () => {
+    expect(parseCliArgs(["entrada.js", "--output", "out/app.go"]).arquivoSaida).toBe("out/app.go");
+    expect(parseCliArgs(["entrada.js", "--output=out/app.go"]).arquivoSaida).toBe("out/app.go");
+    expect(parseCliArgs(["entrada.js", "--out", "a.go"]).arquivoSaida).toBe("a.go");
+    expect(parseCliArgs(["entrada.js", "-o", "a.go"]).arquivoSaida).toBe("a.go");
   });
 
-  test("rejeita --output com argumento vazio", () => {
-    const resultado = executarCLI("--output=");
-
-    expect(resultado.exitCode).toBe(1);
-    expect(resultado.stderr).toContain(
-      "exige um arquivo de saída"
-    );
+  test("interpreta --json sem confundir arquivo .js como destino JSON", () => {
+    const parsed = parseCliArgs(["--json", "entrada.js"]);
+    expect(parsed.saveJson).toBe(true);
+    expect(parsed.arquivoJson).toBe("output.json");
+    expect(parsed.arquivoFonte).toBe("entrada.js");
   });
 
-  test("nao gera saida para fonte inexistente", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "inexistente.js");
-      const saida = join(pasta, "saida.go");
+  test("interpreta --json com caminho explícito e --json=", () => {
+    const comEspaco = parseCliArgs(["entrada.js", "--json", "res.json"]);
+    expect(comEspaco.saveJson).toBe(true);
+    expect(comEspaco.arquivoJson).toBe("res.json");
+    expect(comEspaco.arquivoFonte).toBe("entrada.js");
 
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
+    const comIgual = parseCliArgs(["entrada.js", "--json=res.json"]);
+    expect(comIgual.saveJson).toBe(true);
+    expect(comIgual.arquivoJson).toBe("res.json");
+    expect(comIgual.arquivoFonte).toBe("entrada.js");
+  });
+});
 
-      expect(resultado.exitCode).toBe(1);
-      expect(existsSync(saida)).toBe(false);
-      expect(resultado.stderr).toContain(
-        "Falha ao ler o arquivo"
-      );
-    });
+describe("CLI — execução ponta a ponta", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "compilador-cli-"));
   });
 
-  test("nao gera arquivo em caso de erro sintatico", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "invalido.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(entrada, "let x = (1 + 2;");
-
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
-
-      expect(resultado.exitCode).toBe(1);
-      expect(existsSync(saida)).toBe(false);
-      expect(resultado.stderr).toContain(
-        "Falha na compilação"
-      );
-    });
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("nao gera arquivo em caso de erro semantico", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "invalido.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(
-        entrada,
-        'let x = 1; x = "texto";'
-      );
-
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
-
-      expect(resultado.exitCode).toBe(1);
-      expect(existsSync(saida)).toBe(false);
-      expect(resultado.stderr).toContain(
-        "Falha na compilação"
-      );
-    });
+  test("sem flags não imprime nem gera nenhum arquivo (fallback)", () => {
+    const res = executarCli([], tempDir);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout.toString().trim()).toBe("");
+    expect(res.stderr.toString().trim()).toBe("");
+    expect(readdirSync(tempDir)).toEqual([]);
   });
 
-  test("preserva arquivo existente se a compilacao falhar", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "invalido.js");
-      const saida = join(pasta, "saida.go");
-
-      writeFileSync(entrada, "let x = (1 + 2;");
-      writeFileSync(saida, "conteudo anterior");
-
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
-
-      expect(resultado.exitCode).toBe(1);
-      expect(readFileSync(saida, "utf-8")).toBe(
-        "conteudo anterior"
-      );
-    });
+  test("sem flags não imprime nem gera arquivo com entrada .js", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "let x = 1;", "utf-8");
+    const res = executarCli(["entrada.js"], tempDir);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout.toString().trim()).toBe("");
+    expect(res.stderr.toString().trim()).toBe("");
+    expect(readdirSync(tempDir)).toEqual(["entrada.js"]);
   });
 
-  test("informa erro quando nao consegue gravar a saida", () => {
-    comPastaTemporaria(pasta => {
-      const entrada = join(pasta, "entrada.js");
-      const saida = join(
-        pasta,
-        "pasta-inexistente",
-        "saida.go"
-      );
+  test("com --verbose sem --go não imprime código Go gerado", () => {
+    const res = executarCli(["--verbose"], tempDir);
+    const stdout = res.stdout.toString();
+    expect(res.exitCode).toBe(0);
+    expect(stdout).toContain("[COMPILER]");
+    expect(stdout).not.toContain("=== CODIGO GO GERADO ===");
+    expect(stdout).not.toContain("package main");
+  });
 
-      writeFileSync(entrada, "console.log(10);");
+  test("com --go imprime código Go gerado no terminal", () => {
+    const res = executarCli(["--go"], tempDir);
+    const stdout = res.stdout.toString();
+    expect(res.exitCode).toBe(0);
+    expect(stdout).toContain("=== CODIGO GO GERADO ===");
+    expect(stdout).toContain("package main");
+  });
 
-      const resultado = executarCLI(
-        entrada,
-        "--output",
-        saida
-      );
+  test("gera arquivo .go ao passar <SAIDA>.go posicional (com e sem arquivo fonte)", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "let a = 42;", "utf-8");
+    const res1 = executarCli(["entrada.js", "sub/meu_codigo.go"], tempDir);
+    expect(res1.exitCode).toBe(0);
+    expect(res1.stdout.toString()).not.toContain("=== CODIGO GO GERADO ===");
 
-      expect(resultado.exitCode).toBe(1);
-      expect(resultado.stderr).toContain(
-        "Falha ao gravar o arquivo"
-      );
-    });
+    const caminho1 = join(tempDir, "sub/meu_codigo.go");
+    expect(existsSync(caminho1)).toBe(true);
+    const conteudo1 = readFileSync(caminho1, "utf-8");
+    expect(conteudo1).toContain("package main");
+    expect(conteudo1).toContain("var a float64 = 42");
+
+    const res2 = executarCli(["apenas_saida.go"], tempDir);
+    expect(res2.exitCode).toBe(0);
+    expect(existsSync(join(tempDir, "apenas_saida.go"))).toBe(true);
+    expect(readFileSync(join(tempDir, "apenas_saida.go"), "utf-8")).toContain("package main");
+  });
+
+  test("gera arquivo .go ao usar --output", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "const ok = true;", "utf-8");
+    const res = executarCli(["entrada.js", "--output", "custom.go"], tempDir);
+    expect(res.exitCode).toBe(0);
+    expect(existsSync(join(tempDir, "custom.go"))).toBe(true);
+    expect(readFileSync(join(tempDir, "custom.go"), "utf-8")).toContain("const ok = true");
+  });
+
+  test("com --json salva output completo em output.json", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "let n = 10;", "utf-8");
+    const res = executarCli(["entrada.js", "--json"], tempDir);
+    expect(res.exitCode).toBe(0);
+
+    const caminhoJson = join(tempDir, "output.json");
+    expect(existsSync(caminhoJson)).toBe(true);
+    const dados = JSON.parse(readFileSync(caminhoJson, "utf-8"));
+    expect(dados.sucesso).toBe(true);
+    expect(Array.isArray(dados.tokens)).toBe(true);
+    expect(Array.isArray(dados.ast)).toBe(true);
+    expect(Array.isArray(dados.tabelaSimbolos)).toBe(true);
+    expect(dados.codigoGerado).toContain("var n float64 = 10");
+  });
+
+  test("com --ast --tokens --json relatorio.json filtra o JSON e não imprime no terminal", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "let n = 5;", "utf-8");
+    const res = executarCli(["entrada.js", "--ast", "--tokens", "--json", "relatorio.json"], tempDir);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout.toString()).not.toContain("=== AST GERADA ===");
+    expect(res.stdout.toString()).not.toContain("=== TOKENS ===");
+
+    const dados = JSON.parse(readFileSync(join(tempDir, "relatorio.json"), "utf-8"));
+    expect(Array.isArray(dados.ast)).toBe(true);
+    expect(Array.isArray(dados.tokens)).toBe(true);
+    expect(dados.codigoGerado).toBeUndefined();
+    expect(dados.tabelaSimbolos).toBeUndefined();
+  });
+
+  test("gera ambos <SAIDA>.go e <arquivo>.json quando combinados", () => {
+    writeFileSync(join(tempDir, "entrada.js"), "let v = 7;", "utf-8");
+    const res = executarCli(["entrada.js", "saida.go", "--json", "res.json"], tempDir);
+    expect(res.exitCode).toBe(0);
+    expect(existsSync(join(tempDir, "saida.go"))).toBe(true);
+    expect(existsSync(join(tempDir, "res.json"))).toBe(true);
+  });
+
+  test("erro semântico retorna exitCode 1 e não gera arquivo .go", () => {
+    writeFileSync(join(tempDir, "erro.js"), 'let x = 1; x = "a";', "utf-8");
+    const res = executarCli(["erro.js", "saida.go"], tempDir);
+    expect(res.exitCode).toBe(1);
+    expect(existsSync(join(tempDir, "saida.go"))).toBe(false);
   });
 });

@@ -1,139 +1,184 @@
-
-import { readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname } from "path";
 import Compiler from "./Compiler";
 
-// Extrai os argumentos repassados via linha de comando
-const args = process.argv.slice(2);
+export interface CliOptions {
+  help: boolean;
+  verbose: boolean;
+  showAst: boolean;
+  showTokens: boolean;
+  showTS: boolean;
+  showGo: boolean;
+  saveJson: boolean;
+  arquivoJson?: string;
+  arquivoSaida?: string;
+  arquivoFonte?: string;
+}
+
+const FLAGS_SAIDA_GO = new Set(["-o", "--out", "--output"]);
+const PREFIXOS_SAIDA_GO = ["-o=", "--out=", "--output="];
 
 /**
- * Extrai o caminho do arquivo de saída e os argumentos consumidos.
- * Aceita --output, --out e -o.
+ * Interpreta os argumentos de linha de comando da CLI.
  */
-function extrairOpcoesSaida(listaArgs: string[]): {
-  arquivoSaida?: string;
-  indicesConsumidos: Set<number>;
-  erro?: string;
-} {
+export function parseCliArgs(listaArgs: string[]): CliOptions {
   const indicesConsumidos = new Set<number>();
   const flagsSaida = ["--output", "--out", "-o"];
 
   let arquivoSaida: string | undefined;
+  let arquivoJson: string | undefined;
+  let saveJson = false;
 
   for (let i = 0; i < listaArgs.length; i++) {
     const arg = listaArgs[i];
 
-    if (flagsSaida.includes(arg)) {
-      const proximo = listaArgs[i + 1];
-
-      if (!proximo?.trim() || proximo.startsWith("-")) {
-        return {
-          indicesConsumidos,
-          erro: `A flag ${arg} exige um arquivo de saída.`,
-        };
-      }
-
-      arquivoSaida = proximo;
+    if (FLAGS_SAIDA_GO.has(arg)) {
       indicesConsumidos.add(i);
-      indicesConsumidos.add(i + 1);
+      if (i + 1 < listaArgs.length && !listaArgs[i + 1].startsWith("-")) {
+        arquivoSaida = listaArgs[i + 1];
+        indicesConsumidos.add(i + 1);
+      }
+      continue;
+    }
 
-      i++;
-    } else {
-      const flag = flagsSaida.find(
-        f => arg.startsWith(`${f}=`)
-      );
+    const prefixoSaida = PREFIXOS_SAIDA_GO.find((p) => arg.startsWith(p));
+    if (prefixoSaida) {
+      const valor = arg.slice(prefixoSaida.length);
+      if (valor) arquivoSaida = valor;
+      indicesConsumidos.add(i);
+      continue;
+    }
 
-      if (flag) {
-        arquivoSaida = arg.slice(flag.length + 1);
-        indicesConsumidos.add(i);
+    if (arg.startsWith("--json=")) {
+      saveJson = true;
+      arquivoJson = arg.slice("--json=".length) || "output.json";
+      indicesConsumidos.add(i);
+      continue;
+    }
 
-        if (!arquivoSaida.trim()) {
-          return {
-            indicesConsumidos,
-            erro: `A flag ${flag} exige um arquivo de saída.`,
-          };
-        }
+    if (arg === "--json") {
+      saveJson = true;
+      indicesConsumidos.add(i);
+      if (
+        i + 1 < listaArgs.length &&
+        !listaArgs[i + 1].startsWith("-") &&
+        /\.json$/i.test(listaArgs[i + 1])
+      ) {
+        arquivoJson = listaArgs[i + 1];
+        indicesConsumidos.add(i + 1);
       }
     }
   }
 
-  return { arquivoSaida, indicesConsumidos };
+  let arquivoFonte: string | undefined;
+
+  for (let i = 0; i < listaArgs.length; i++) {
+    const arg = listaArgs[i];
+    if (arg.startsWith("-") || indicesConsumidos.has(i)) continue;
+
+    if (/\.go$/i.test(arg)) {
+      if (!arquivoSaida) arquivoSaida = arg;
+      indicesConsumidos.add(i);
+      continue;
+    }
+
+    if (saveJson && !arquivoJson && /\.json$/i.test(arg)) {
+      arquivoJson = arg;
+      indicesConsumidos.add(i);
+      continue;
+    }
+
+    if (!arquivoFonte) {
+      arquivoFonte = arg;
+    }
+  }
+
+  if (saveJson && !arquivoJson) {
+    arquivoJson = "output.json";
+  }
+
+  return {
+    help: listaArgs.includes("--help") || listaArgs.includes("-h"),
+    verbose: listaArgs.includes("--verbose"),
+    showAst: listaArgs.includes("--ast"),
+    showTokens: listaArgs.includes("--tokens"),
+    showTS: listaArgs.includes("--ts"),
+    showGo: listaArgs.includes("--go"),
+    saveJson,
+    arquivoJson,
+    arquivoSaida,
+    arquivoFonte,
+  };
 }
 
-// Mapeia as flags booleanas
-const help = args.includes("--help") || args.includes("-h");
-const verbose = args.includes("--verbose");
-const showAst = args.includes("--ast");
-const showTokens = args.includes("--tokens");
-const showTS = args.includes("--ts");
-const showGo = args.includes("--go");
+function salvarArquivo(caminho: string, conteudo: string): void {
+  const dir = dirname(caminho);
+  if (dir && dir !== ".") {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(caminho, conteudo, "utf-8");
+}
 
-const {
-  arquivoSaida,
-  indicesConsumidos,
-  erro
-} = extrairOpcoesSaida(args);
-
-// Identifica o arquivo fonte sem confundir com o arquivo de saída
-const arquivoFonte = args.find(
-  (arg, indice) =>
-    !arg.startsWith("-") && !indicesConsumidos.has(indice)
-);
-
-// Exibe a ajuda
-if (help) {
+function exibirAjuda(): void {
   console.log(`
-Uso: bun start [arquivo.js] [opcoes]
+Uso: bun start [arquivo.js] [saida.go] [opcoes]
 
 Opções:
-  -h, --help             Exibe esta tela de ajuda.
-  --verbose              Ativa logs detalhados da compilação.
-  --ast                  Imprime a Árvore Sintática Abstrata.
-  --tokens               Imprime os tokens.
-  --ts                   Imprime a tabela de símbolos.
-  --go                   Imprime o código Go gerado.
-  --output <arquivo.go>  Salva o código Go no arquivo especificado.
-  -o, --out <arquivo>    Apelidos para a opção --output.
+  -h, --help                   Exibe esta tela de ajuda e encerra a execução.
+  --verbose                    Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
+  --ast                        Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
+  --tokens                     Imprime a entrada em tokens final no terminal.
+  --ts                         Imprime a tabela de simbolos no terminal.
+  --go                         Imprime o codigo Go gerado no terminal.
+  -o, --out, --output <arq>    Salva o codigo Go gerado no arquivo especificado (ou passe <saida>.go diretamente).
+  --json [arquivo.json]        Salva o output da compilação em formato JSON (padrão: output.json).
 
 Exemplos de uso:
   bun start teste.js
-  bun start teste.js --verbose
+  bun start teste.js saida.go
+  bun start teste.js --output saida.go
+  bun start teste.js --go
   bun start teste.js --tokens
   bun start teste.js --ts
-  bun start teste.js --go
-  bun start teste.js --output saida.go
-  bun start teste.js --out saida.go
-  bun start teste.js -o saida.go
+  bun start teste.js --json
+  bun start teste.js --ast --json saida.json
   bun start teste.js --ast --verbose
-  bun start teste.js --tokens --ast --verbose
   `);
-
-  process.exit(0);
 }
 
-async function run() {
-  if (erro) {
-    throw new Error(erro);
-  }
-
-  const compiler = new Compiler({
+/**
+ * Executa a CLI do compilador com os argumentos fornecidos.
+ */
+export async function run(listaArgs: string[] = process.argv.slice(2)): Promise<number> {
+  const {
+    help,
     verbose,
     showAst,
     showTokens,
-    showGo
-  });
+    showTS,
+    showGo,
+    saveJson,
+    arquivoJson,
+    arquivoSaida,
+    arquivoFonte,
+  } = parseCliArgs(listaArgs);
 
+  if (help) {
+    exibirAjuda();
+    return 0;
+  }
+
+  const compiler = new Compiler({ verbose, showAst, showTokens, showGo });
   let input = "";
 
   if (arquivoFonte) {
     try {
       input = readFileSync(arquivoFonte, "utf-8");
-    } catch (err) {
-      throw new Error(
-        `Falha ao ler o arquivo '${arquivoFonte}': ${err}`
-      );
+    } catch (err: any) {
+      console.error(`\x1b[31m[ERROR]\x1b[0m Falha ao ler o arquivo '${arquivoFonte}': ${err.message}`);
+      return 1;
     }
   } else {
-    // Preserva o modo de fallback para desenvolvimento
     if (verbose) {
       console.log(
         "\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback)."
@@ -163,84 +208,65 @@ async function run() {
     `;
   }
 
-  // Executa o pipeline completo do compilador
   const sucesso = await compiler.compile(input);
+  const tabelaFiltrada = compiler.tabelaSimbolos?.filter(
+    (simbolo) => simbolo.linhaDeclaracao > 0
+  );
 
-  // Exibe a AST quando solicitado
-  if (showAst && compiler.ast) {
-    console.log("\n\x1b[35m=== AST GERADA ===\x1b[0m");
-    console.log(JSON.stringify(compiler.ast, null, 2));
-  }
+  if (saveJson && arquivoJson) {
+    const temFiltroSaida = showAst || showTokens || showTS || showGo;
+    const payloadJson = temFiltroSaida
+      ? {
+          ...(showTokens ? { tokens: compiler.tokens } : {}),
+          ...(showAst ? { ast: compiler.ast ?? null } : {}),
+          ...(showTS ? { tabelaSimbolos: tabelaFiltrada ?? [] } : {}),
+          ...(showGo ? { codigoGerado: compiler.codigoGerado ?? null } : {}),
+        }
+      : {
+          sucesso,
+          tokens: compiler.tokens,
+          ast: compiler.ast ?? null,
+          tabelaSimbolos: tabelaFiltrada ?? [],
+          codigoGerado: compiler.codigoGerado ?? null,
+          ...(compiler.errosSintaticos && compiler.errosSintaticos.length > 0
+            ? { errosSintaticos: compiler.errosSintaticos }
+            : {}),
+        };
 
-  // Exibe os tokens quando solicitado
-  if (showTokens && compiler.tokens) {
-    console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
-    console.log(JSON.stringify(compiler.tokens, null, 2));
-  }
+    salvarArquivo(arquivoJson, JSON.stringify(payloadJson, null, 2));
+    console.log(`\x1b[32m[INFO]\x1b[0m Output JSON salvo em '${arquivoJson}'.`);
+  } else {
+    if (showAst && compiler.ast) {
+      console.log("\n\x1b[35m=== AST GERADA ===\x1b[0m");
+      console.log(JSON.stringify(compiler.ast, null, 2));
+    }
 
-  // Exibe a tabela de símbolos quando solicitado
-  if (showTS && compiler.tabelaSimbolos) {
-    const tabelaFiltrada = compiler.tabelaSimbolos.filter(
-      simbolo => simbolo.linhaDeclaracao > 0
-    );
+    if (showTokens && compiler.tokens) {
+      console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
+      console.log(JSON.stringify(compiler.tokens, null, 2));
+    }
 
-    console.log(
-      "\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m"
-    );
+    if (showTS && tabelaFiltrada) {
+      console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
+      console.log(JSON.stringify(tabelaFiltrada, null, 2));
+    }
 
-    console.log(JSON.stringify(tabelaFiltrada, null, 2));
-  }
-
-  // Impede a gravação em caso de falha na compilação
-  if (!sucesso) {
-    throw new Error(
-      "Falha na compilação. Nenhum arquivo foi gerado."
-    );
-  }
-
-  if (!compiler.codigoGerado?.trim()) {
-    throw new Error(
-      "O compilador não gerou código Go."
-    );
-  }
-
-  // Grava o código Go no arquivo especificado
-  if (arquivoSaida !== undefined) {
-    try {
-      writeFileSync(
-        arquivoSaida,
-        compiler.codigoGerado,
-        "utf-8"
-      );
-
-      console.log(
-        `\x1b[32m[INFO]\x1b[0m Código Go salvo em '${arquivoSaida}'.`
-      );
-    } catch (err) {
-      throw new Error(
-        `Falha ao gravar o arquivo '${arquivoSaida}': ${err}`
-      );
+    if (sucesso && showGo && compiler.codigoGerado) {
+      console.log("\n\x1b[35m=== CODIGO GO GERADO ===\x1b[0m");
+      console.log(compiler.codigoGerado);
     }
   }
 
-  // Preserva o comportamento de exibição do código Go
-  if (
-    showGo ||
-    (!arquivoSaida && !showAst && !showTokens && !showTS)
-  ) {
-    console.log(
-      "\n\x1b[35m=== CODIGO GO GERADO ===\x1b[0m"
-    );
-
-    console.log(compiler.codigoGerado);
+  if (sucesso && compiler.codigoGerado && arquivoSaida) {
+    salvarArquivo(arquivoSaida, compiler.codigoGerado);
+    console.log(`\x1b[32m[INFO]\x1b[0m Código Go salvo em '${arquivoSaida}'.`);
   }
+
+  return sucesso ? 0 : 1;
 }
 
-// Tratamento centralizado de erros da CLI
-run().catch((erro: unknown) => {
-  const mensagem =
-    erro instanceof Error ? erro.message : String(erro);
-
-  console.error(`\x1b[31m[ERROR]\x1b[0m ${mensagem}`);
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  run().then((code) => {
+    if (code !== 0) process.exit(code);
+  });
+}
