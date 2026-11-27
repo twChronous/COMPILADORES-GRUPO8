@@ -31,6 +31,9 @@ export default class GoGenerator extends GeneratorModel {
   private imports: Set<string> = new Set();
   // Deduz os tipos Go de parâmetros, retornos e variáveis (o semântico só devolve `any` para eles). 
   private readonly inferencia = new InferenciaTiposGo();
+  //Tipo Go de retorno da função em geração (texto vazio quando é `void`). 
+  private retornoAtual = "";
+
 
   private readonly formatadoresLiteral: Record<NoLiteral["tipoDado"], (valor: string) => string> = {
     NUMERO: (valor) => valor,
@@ -115,7 +118,7 @@ export default class GoGenerator extends GeneratorModel {
    */
   public gerar(corpo: NoStatement[]): string {
     this.imports = new Set();
-
+    this.retornoAtual = "";
     this.inferencia.analisar(corpo);
 
     const funcoesTopo: string[] = [];
@@ -247,18 +250,43 @@ export default class GoGenerator extends GeneratorModel {
    * @param no Nó de declaração de função da AST.
    * @returns Código completo da função em Go.
    */
-  private gerarDeclaracaoFuncao(no: NoDeclaracaoFuncao): string {
+
+   private gerarDeclaracaoFuncao(no: NoDeclaracaoFuncao): string {
     const parametros = no.parametros
       .map((p, i) => `${p.nome} ${this.mapearTipo(this.inferencia.tipoParametro(no.nome, i))}`)
       .join(", ");
     const tipoRetorno = this.inferirRetornoFuncao(no.corpo);
     const assinaturaRetorno = tipoRetorno ? ` ${tipoRetorno}` : "";
+
+    const retornoAnterior = this.retornoAtual;
+    this.retornoAtual = tipoRetorno;
     const linhasCorpo = no.corpo.corpo.map((stmt) => this.gerarStatement(stmt, 1));
+    this.retornoAtual = retornoAnterior;
+
+    // fim da função devolve `undefined`; aqui devolvemos o valor zero do tipo de retorno.
+    const ultimo = no.corpo.corpo[no.corpo.corpo.length - 1];
+    if (tipoRetorno && ultimo?.tipo !== "ReturnStatement") {
+      linhasCorpo.push(`${this.indentar(1)}return ${this.valorZero(tipoRetorno)}`);
+    }
+
     const corpoFormatado = linhasCorpo.length > 0 ? `\n${linhasCorpo.join("\n")}\n` : "\n";
 
     return `func ${no.nome}(${parametros})${assinaturaRetorno} {${corpoFormatado}}`;
   }
 
+  //Valor zero de um tipo Go, usado em `return` vazio e no fim de funções que retornam valor.
+  private valorZero(tipoGo: string): string {
+    switch (tipoGo) {
+      case "float64":
+        return "0";
+      case "string":
+        return '""';
+      case "bool":
+        return "false";
+      default:
+        return "nil";
+    }
+  }
   /**
    * Coleta recursivamente todos os `ReturnStatement` dentro do corpo de uma função,
    * sem invadir declarações de funções internas.
@@ -303,8 +331,11 @@ export default class GoGenerator extends GeneratorModel {
    * @returns Linha `return` em Go.
    */
   private gerarReturn(no: NoReturnStatement, nivel: number): string {
-    const retorno = no.argumento ? ` ${this.gerarExpressao(no.argumento)}` : "";
-    return `${this.indentar(nivel)}return${retorno}`;
+    if (no.argumento) return `${this.indentar(nivel)}return ${this.gerarExpressao(no.argumento)}`;
+    // Em uma função que retorna valor, um `return;` vazio devolve o valor zero do tipo.
+    return this.retornoAtual
+      ? `${this.indentar(nivel)}return ${this.valorZero(this.retornoAtual)}`
+      : `${this.indentar(nivel)}return`;
   }
 
   /**
