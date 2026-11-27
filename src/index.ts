@@ -1,80 +1,171 @@
-import { readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname } from "path";
 import Compiler from "./Compiler";
 
-// Extrai os argumentos repassados via linha de comando
-const args = process.argv.slice(2);
+export interface CliOptions {
+  help: boolean;
+  verbose: boolean;
+  showAst: boolean;
+  showTokens: boolean;
+  showTS: boolean;
+  showGo: boolean;
+  saveJson: boolean;
+  arquivoJson?: string;
+  arquivoSaida?: string;
+  arquivoFonte?: string;
+}
+
+const FLAGS_SAIDA_GO = new Set(["-o", "--out", "--output"]);
+const PREFIXOS_SAIDA_GO = ["-o=", "--out=", "--output="];
 
 /**
- * Extrai o caminho do arquivo de saída (--out / -o) e os índices de argumentos consumidos.
+ * Interpreta os argumentos de linha de comando da CLI.
  */
-function extrairOpcoesSaida(listaArgs: string[]): {
-  arquivoSaida?: string;
-  indicesConsumidos: Set<number>;
-} {
+export function parseCliArgs(listaArgs: string[]): CliOptions {
   const indicesConsumidos = new Set<number>();
   let arquivoSaida: string | undefined;
+  let arquivoJson: string | undefined;
+  let saveJson = false;
 
   for (let i = 0; i < listaArgs.length; i++) {
     const arg = listaArgs[i];
-    if (arg === "--out" || arg === "-o") {
+
+    if (FLAGS_SAIDA_GO.has(arg)) {
       indicesConsumidos.add(i);
       if (i + 1 < listaArgs.length && !listaArgs[i + 1].startsWith("-")) {
         arquivoSaida = listaArgs[i + 1];
         indicesConsumidos.add(i + 1);
       }
-    } else if (arg.startsWith("--out=")) {
-      arquivoSaida = arg.slice("--out=".length);
+      continue;
+    }
+
+    const prefixoSaida = PREFIXOS_SAIDA_GO.find((p) => arg.startsWith(p));
+    if (prefixoSaida) {
+      const valor = arg.slice(prefixoSaida.length);
+      if (valor) arquivoSaida = valor;
       indicesConsumidos.add(i);
-    } else if (arg.startsWith("-o=")) {
-      arquivoSaida = arg.slice("-o=".length);
+      continue;
+    }
+
+    if (arg.startsWith("--json=")) {
+      saveJson = true;
+      arquivoJson = arg.slice("--json=".length) || "output.json";
       indicesConsumidos.add(i);
+      continue;
+    }
+
+    if (arg === "--json") {
+      saveJson = true;
+      indicesConsumidos.add(i);
+      if (
+        i + 1 < listaArgs.length &&
+        !listaArgs[i + 1].startsWith("-") &&
+        /\.json$/i.test(listaArgs[i + 1])
+      ) {
+        arquivoJson = listaArgs[i + 1];
+        indicesConsumidos.add(i + 1);
+      }
     }
   }
 
-  return { arquivoSaida, indicesConsumidos };
+  let arquivoFonte: string | undefined;
+
+  for (let i = 0; i < listaArgs.length; i++) {
+    const arg = listaArgs[i];
+    if (arg.startsWith("-") || indicesConsumidos.has(i)) continue;
+
+    if (/\.go$/i.test(arg)) {
+      if (!arquivoSaida) arquivoSaida = arg;
+      indicesConsumidos.add(i);
+      continue;
+    }
+
+    if (saveJson && !arquivoJson && /\.json$/i.test(arg)) {
+      arquivoJson = arg;
+      indicesConsumidos.add(i);
+      continue;
+    }
+
+    if (!arquivoFonte) {
+      arquivoFonte = arg;
+    }
+  }
+
+  if (saveJson && !arquivoJson) {
+    arquivoJson = "output.json";
+  }
+
+  return {
+    help: listaArgs.includes("--help") || listaArgs.includes("-h"),
+    verbose: listaArgs.includes("--verbose"),
+    showAst: listaArgs.includes("--ast"),
+    showTokens: listaArgs.includes("--tokens"),
+    showTS: listaArgs.includes("--ts"),
+    showGo: listaArgs.includes("--go"),
+    saveJson,
+    arquivoJson,
+    arquivoSaida,
+    arquivoFonte,
+  };
 }
 
-// Mapeia as flags booleanas e argumentos de entrada/saída
-const help = args.includes("--help") || args.includes("-h");
-const verbose = args.includes("--verbose");
-const showAst = args.includes("--ast");
-const showTokens = args.includes("--tokens");
-const showTS = args.includes("--ts");
-const showGo = args.includes("--go");
-const { arquivoSaida, indicesConsumidos } = extrairOpcoesSaida(args);
+function salvarArquivo(caminho: string, conteudo: string): void {
+  const dir = dirname(caminho);
+  if (dir && dir !== ".") {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(caminho, conteudo, "utf-8");
+}
 
-// O arquivo fonte será o primeiro argumento posicional não consumido por flags
-const arquivoFonte = args.find(
-  (arg, indice) => !arg.startsWith("-") && !indicesConsumidos.has(indice)
-);
-
-// Intercepta a execução se a flag de ajuda for chamada
-if (help) {
+function exibirAjuda(): void {
   console.log(`
-Uso: run src/index.ts [arquivo.js] [opcoes]
+Uso: bun start [arquivo.js] [saida.go] [opcoes]
 
 Opções:
-  -h, --help          Exibe esta tela de ajuda e encerra a execução.
-  --verbose           Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
-  --ast               Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
-  --tokens            Imprime a entrada em tokens final no terminal.
-  --ts                Imprime a tabela de simbolos no terminal.
-  --go                Imprime o codigo Go gerado no terminal.
-  -o, --out <arquivo> Salva o codigo Go gerado no arquivo especificado.
+  -h, --help                   Exibe esta tela de ajuda e encerra a execução.
+  --verbose                    Ativa logs detalhados do processo de compilacao (Lexer, Parser, etc).
+  --ast                        Imprime a Arvore Sintatica Abstrata (AST) final no terminal.
+  --tokens                     Imprime a entrada em tokens final no terminal.
+  --ts                         Imprime a tabela de simbolos no terminal.
+  --go                         Imprime o codigo Go gerado no terminal.
+  -o, --out, --output <arq>    Salva o codigo Go gerado no arquivo especificado (ou passe <saida>.go diretamente).
+  --json [arquivo.json]        Salva o output da compilação em formato JSON (padrão: output.json).
 
 Exemplos de uso:
-  run src/index.ts teste.js
-  run src/index.ts teste.js --verbose
-  run src/index.ts teste.js --tokens
-  run src/index.ts teste.js --ts
-  run src/index.ts teste.js --go
-  run src/index.ts teste.js --out saida.go
-  run src/index.ts teste.js --ast --verbose
-  run src/index.ts teste.js --tokens --ast --verbose
+  bun start teste.js
+  bun start teste.js saida.go
+  bun start teste.js --output saida.go
+  bun start teste.js --go
+  bun start teste.js --tokens
+  bun start teste.js --ts
+  bun start teste.js --json
+  bun start teste.js --ast --json saida.json
+  bun start teste.js --ast --verbose
   `);
-  process.exit(0);
 }
-async function run() {
+
+/**
+ * Executa a CLI do compilador com os argumentos fornecidos.
+ */
+export async function run(listaArgs: string[] = process.argv.slice(2)): Promise<number> {
+  const {
+    help,
+    verbose,
+    showAst,
+    showTokens,
+    showTS,
+    showGo,
+    saveJson,
+    arquivoJson,
+    arquivoSaida,
+    arquivoFonte,
+  } = parseCliArgs(listaArgs);
+
+  if (help) {
+    exibirAjuda();
+    return 0;
+  }
+
   const compiler = new Compiler({ verbose, showAst, showTokens, showGo });
   let input = "";
 
@@ -83,10 +174,9 @@ async function run() {
       input = readFileSync(arquivoFonte, "utf-8");
     } catch (err: any) {
       console.error(`\x1b[31m[ERROR]\x1b[0m Falha ao ler o arquivo '${arquivoFonte}': ${err.message}`);
-      process.exit(1);
+      return 1;
     }
   } else {
-    // Modo de fallback embutido, ideal para desenvolvimento rápido
     if (verbose) {
       console.log("\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback).");
     }
@@ -111,41 +201,65 @@ async function run() {
     `;
   }
 
-  // Executa toda a esteira de loaders, léxico, sintático e semântico
   const sucesso = await compiler.compile(input);
+  const tabelaFiltrada = compiler.tabelaSimbolos?.filter(
+    (simbolo) => simbolo.linhaDeclaracao > 0
+  );
 
-  // Saída formatada opcional baseada em flag
-  if (showAst && compiler.ast) {
-    console.log("\n\x1b[35m=== AST GERADA ===\x1b[0m");
-    console.log(JSON.stringify(compiler.ast, null, 2));
-  }
+  if (saveJson && arquivoJson) {
+    const temFiltroSaida = showAst || showTokens || showTS || showGo;
+    const payloadJson = temFiltroSaida
+      ? {
+          ...(showTokens ? { tokens: compiler.tokens } : {}),
+          ...(showAst ? { ast: compiler.ast ?? null } : {}),
+          ...(showTS ? { tabelaSimbolos: tabelaFiltrada ?? [] } : {}),
+          ...(showGo ? { codigoGerado: compiler.codigoGerado ?? null } : {}),
+        }
+      : {
+          sucesso,
+          tokens: compiler.tokens,
+          ast: compiler.ast ?? null,
+          tabelaSimbolos: tabelaFiltrada ?? [],
+          codigoGerado: compiler.codigoGerado ?? null,
+          ...(compiler.errosSintaticos && compiler.errosSintaticos.length > 0
+            ? { errosSintaticos: compiler.errosSintaticos }
+            : {}),
+        };
 
-  if (showTokens && compiler.tokens) {
-    console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
-    console.log(JSON.stringify(compiler.tokens, null, 2));
-  }
-  if (showTS && compiler.tabelaSimbolos) {
-    const tabela_filtrada = compiler.tabelaSimbolos.filter(
-        (simbolo) => simbolo.linhaDeclaracao > 0
-      );
-    console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
-    console.log(JSON.stringify(tabela_filtrada, null, 2));
-  }
-
-  if (sucesso && compiler.codigoGerado) {
-    if (arquivoSaida) {
-      writeFileSync(arquivoSaida, compiler.codigoGerado, "utf-8");
-      console.log(`\x1b[32m[INFO]\x1b[0m Código Go salvo em '${arquivoSaida}'.`);
+    salvarArquivo(arquivoJson, JSON.stringify(payloadJson, null, 2));
+    console.log(`\x1b[32m[INFO]\x1b[0m Output JSON salvo em '${arquivoJson}'.`);
+  } else {
+    if (showAst && compiler.ast) {
+      console.log("\n\x1b[35m=== AST GERADA ===\x1b[0m");
+      console.log(JSON.stringify(compiler.ast, null, 2));
     }
-    if (showGo || (!arquivoSaida && !showAst && !showTokens && !showTS)) {
+
+    if (showTokens && compiler.tokens) {
+      console.log("\n\x1b[35m=== TOKENS ===\x1b[0m");
+      console.log(JSON.stringify(compiler.tokens, null, 2));
+    }
+
+    if (showTS && tabelaFiltrada) {
+      console.log("\n\x1b[35m=== TABELA DE SIMBOLOS ===\x1b[0m");
+      console.log(JSON.stringify(tabelaFiltrada, null, 2));
+    }
+
+    if (sucesso && showGo && compiler.codigoGerado) {
       console.log("\n\x1b[35m=== CODIGO GO GERADO ===\x1b[0m");
       console.log(compiler.codigoGerado);
     }
   }
-  // Define um código de saída apropriado para ferramentas de CI/CD
-  if (!sucesso) {
-    process.exit(1);
+
+  if (sucesso && compiler.codigoGerado && arquivoSaida) {
+    salvarArquivo(arquivoSaida, compiler.codigoGerado);
+    console.log(`\x1b[32m[INFO]\x1b[0m Código Go salvo em '${arquivoSaida}'.`);
   }
+
+  return sucesso ? 0 : 1;
 }
 
-run();
+if (import.meta.main) {
+  run().then((code) => {
+    if (code !== 0) process.exit(code);
+  });
+}
