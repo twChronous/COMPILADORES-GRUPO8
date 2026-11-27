@@ -60,6 +60,8 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
    * @returns Retorna `true` se a AST for construída sem erros. Retorna `false` se houver erros.
    */
   public run(): boolean {
+    this.atual = 0;
+    this.erros = [];
     const corpo: NoStatement[] = [];
     while (this.atual < this.client.tokens.length && this.espiar().tipo !== 'EOF') {
       const stmt = this.parseStatement();
@@ -68,6 +70,7 @@ export default class SyntacticAnalyzer extends AnalyzerModel {
       }
     }
     this.client.ast = corpo;
+    this.client.errosSintaticos = this.erros;
     if (this.erros.length > 0) {
       this.erros.forEach(err => this.client.LOG_ERR(err));
       return false;
