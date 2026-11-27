@@ -1,65 +1,63 @@
 # Tradução JavaScript → Go
 
-Este documento registra decisões do gerador de código Go para o subconjunto
-suportado. A issue **#67** cobre expressões, literais e declarações de
-variáveis; controle de fluxo (#68) e funções (#69) estendem o mesmo pipeline.
+Este documento descreve as regras de emissão de código Go implementadas no
+pipeline do compilador a partir da AST anotada e da inferência em `go.inference.ts`.
 
-## Tipos estáticos
+## Estrutura do arquivo gerado
 
-Os tipos vêm de `tipoInferido` na AST (após o analisador semântico) e da
-`tabelaSimbolos` quando necessário.
+- **Pacote:** sempre `package main`.
+- **Imports:** coletados automaticamente durante a geração (ex.: `import "fmt"` ao
+  usar `console.log`) e ordenados alfabeticamente; quando há mais de um pacote,
+  usa `import ( ... )`.
+- **Funções:** declarações `DeclaracaoFuncao` no nível superior são emitidas como
+  `func nome(params...) [tipoRetorno] { ... }`.
+- **Ponto de entrada:** os demais comandos do nível superior são emitidos dentro
+  de `func main() { ... }`.
 
-| Tipo semântico (JS) | Tipo Go emitido |
-|--------------------|-----------------|
-| `number`           | `float64`       |
-| `string`           | `string`        |
-| `boolean`          | `bool`          |
-| `null`             | `interface{}` (valor `nil`) |
-| `undefined`        | valor zero do tipo de contexto |
-| `any`, `object`    | `interface{}`   |
+## Tipos e literais
 
-Números JavaScript são mapeados para `float64` para aproximar o comportamento
-dinâmico de `number` em JS.
+### Mapeamento de tipos
 
-## Declarações
+| Tipo semântico (JS) / contexto | Tipo Go emitido | Observações |
+|-------------------------------|-----------------|-------------|
+| `number` | `float64` | Aproxima números JS por ponto flutuante de 64 bits |
+| `string` | `string` | Strings em Go |
+| `boolean` | `bool` | Booleanos em Go |
+| `any`, `null`, `undefined`, `void`, `object`, `function` | `any` | Fallback de `mapearTipo()` quando não há tipo primitivo direto |
 
-| JS            | Go emitido                          |
-|---------------|-------------------------------------|
-| `let x = e`   | `var x <tipo> = <e>`                |
-| `var x = e`   | `var x <tipo> = <e>`                |
-| `const x = e` | `const x <tipo> = <e>`              |
+### Literais
 
-O tipo `<tipo>` é derivado da inferência semântica do inicializador.
+| Construção JS | Emissão em Go | Observações |
+|---------------|---------------|-------------|
+| Número (`10`, `3.14`) | `10`, `3.14` | Mantém a lexeme |
+| String (`"abc"`, `'abc'`) | `"abc"` | Aspas duplas com escape de `\`, `"`, `\n`, `\r` e `\t` |
+| Booleano (`true`, `false`) | `true`, `false` | Literal booleano |
+| `null` | `nil` | Em declaração, tipo estático cai em `any` quando não há tipo concreto |
+| `undefined` | `nil` | Emitido como `nil` na expressão literal; em retornos sem valor/fim de função com retorno usa o valor zero do tipo (`0`, `""`, `false`, `nil`) |
 
-## Literais
+## Operadores e precedência
 
-- **Número:** mantém a lexeme (`10`, `3.14`).
-- **String:** aspas duplas com escapes (`\n`, `\"`, etc.).
-- **Boolean:** `true` / `false`.
-- **`null`:** literal `nil`. Em declarações com tipo inferido `null`, o tipo
-  estático emitido é `interface{}`.
-- **`undefined`:** não existe em Go; em expressão usa-se o **valor zero** do
-  tipo de contexto (ex.: `0` para `number`, `""` para `string`, `nil` para
-  `interface{}`).
+- **Operadores binários com mesma grafia:** `+`, `-`, `*`, `/`, `%`, `==`, `!=`,
+  `>`, `<`, `>=`, `<=`, `&&`, `||`.
+- **Operadores de atribuição:** `=`, `+=`, `-=`.
+- **Precedência e parênteses:** a AST já reflete a árvore de precedência; o
+  gerador adiciona parênteses quando a precedência do filho é menor que a do
+  pai, ou quando há operador não associativo à direita (`-`, `/`, `%`) com igual
+  precedência à direita.
 
-## Operadores
+## Comandos, laços, funções e chamadas
 
-Aritméticos, relacionais, igualdade (`==`, `!=`) e lógicos (`&&`, `||`) usam a
-mesma grafia em Go. Atribuições `=`, `+=` e `-=` são emitidas como em Go.
-
-A AST já reflete a precedência; o gerador adiciona parênteses apenas quando um
-operador filho teria precedência menor que o pai.
-
-## Formato de saída (coordenação #68–#70)
-
-- Fragmentos da issue **#67** são linhas válidas dentro de um corpo de função
-  Go (sem `package` / `func` ainda).
-- Issues posteriores devem reutilizar `gerarExpressao`, `gerarStatement` e
-  `gerarStatements` de `GoCodegen.analyzer.ts` para manter um único estilo de
-  emissão.
-
-## Integração
-
-O analisador `GoCodegen` preenche `client.codigoGo` quando `run()` é chamado
-após a análise semântica. A orquestração na classe `Compiler` fica na issue
-**#70**.
+| Construção JS (AST) | Tradução Go | Status / observações |
+|---------------------|-------------|------------------------|
+| `let x = expr` / `var x = expr` | `var x <tipoGo> = <expr>` | Usa tipo deduzido (`float64`, `string`, `bool` ou `any`) |
+| `const x = expr` | `const x = <expr>` (se `tipoGo !== "any"`) ou `var x any = <expr>` | Constantes Go exigem tipo compatível com `const` |
+| `if (c) { ... } else { ... }` | `if <c> { ... } else { ... }` | `else` opcional |
+| `while (c) { ... }` | `for <c> { ... }` | Traduzido para `for` condicional em Go |
+| `for (init; cond; upd) { ... }` | `for <init>; <cond>; <upd> { ... }` | Suporta `for <cond> { ... }`, `for { ... }` e inicialização com `:=` |
+| `break` / `continue` | `break` / `continue` | Mantidos diretamente |
+| `function f(a, b) { ... }` | `func f(a <t1>, b <t2>) <ret> { ... }` | Tipos de parâmetros/retorno inferidos quando possível; completa retorno com valor zero se faltar caminho terminal |
+| `return expr` / `return;` | `return <expr>` / `return` (ou `return <zero>`) | Se `return;` vazio ocorrer em função com tipo de retorno, emite valor zero |
+| `console.log(...)` | `fmt.Println(...)` | Adiciona `"fmt"` aos imports |
+| Outros `AcessoMembro` / `ChamadaFuncao` | `<obj>.<prop>(<args...>)` | Demais métodos/objetos nativos não têm tradução especial mapeada |
+| Função aninhada (`DeclaracaoFuncao` interna) | **Não traduzida** | Lança `Erro de Geração` |
+| Outros comandos fora de `NoStatement` suportado | **Não traduzida** | Lança `Erro de Geração` |
