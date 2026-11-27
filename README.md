@@ -19,6 +19,38 @@ O progresso do compilador seguirá as etapas clássicas de compilação:
 - [x] **Analisador Semântico:** Verificação de tipos e regras de escopo.
 - [x] **Geração de Código Go:** Tradução da AST validada para arquivos `.go` (sem IR nem otimizador neste projeto).
 
+
+### Gerando código Go
+
+Para traduzir um arquivo JavaScript para Go, utilize a flag `--output`:
+
+```bash
+bun start arquivo.js --output saida.go
+```
+
+As opções `--out` e `-o` também são aceitas.
+
+Para visualizar o código Go diretamente no terminal:
+
+```bash
+bun start arquivo.js --go
+```
+
+Para executar o código gerado, é necessário ter o Go instalado:
+
+```bash
+go run saida.go
+```
+
+Para compilar um executável:
+
+```bash
+go build -o saida.exe saida.go
+```
+
+Consulte os [exemplos de compilação JavaScript para Go](./examples/README.md) para obter instruções detalhadas e exemplos das funcionalidades suportadas.
+
+
 ## 🚀 Como Executar (Localmente)
 
 **Pré-requisitos:**
