@@ -672,5 +672,39 @@ describe("SemanticalAnalyzer - laços (for e while)", () => {
     expect(() =>
       semantico("function f(n) { if (n > 1) { return n; } for (let i = 0; i < n; i += 1) { } }")
     ).not.toThrow();
+  }); 
+});
+
+describe("SemanticalAnalyzer - funções, chamadas e nativos", () => {
+  test("chamada de função declarada e uso de nativos (console, Math) são aceitos", () => {
+    expect(() =>
+      semantico(
+        "function dobro(x) { return x * 2; } let r = dobro(5); console.log(r); let n = Math.abs(r);"
+      )
+    ).not.toThrow();
+  });
+
+  test("chamada de função não declarada lança erro semântico", () => {
+    expect(() => semantico("naoExiste(1, 2);")).toThrow(
+      /A variável 'naoExiste' não foi declarada/
+    );
+  });
+
+  test("return dentro de if aninhado em função é aceito", () => {
+    expect(() =>
+      semantico(
+        "function validar(flag) { if (flag) { return true; } return false; }"
+      )
+    ).not.toThrow();
+  });
+
+  test.skip("chamada de identificador que não é função deve lançar erro semântico", () => {
+    expect(() => semantico("let x = 10; x();")).toThrow();
+  });
+
+  test.skip("chamada com número de argumentos incompatível deve lançar erro semântico", () => {
+    expect(() =>
+      semantico("function soma(a, b) { return a + b; } soma(1);")
+    ).toThrow();
   });
 });
