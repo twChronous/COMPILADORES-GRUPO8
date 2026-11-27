@@ -14,12 +14,10 @@ Este README serve como visão geral do projeto. Para informações detalhadas so
 
 O progresso do compilador seguirá as etapas clássicas de compilação:
 
-- [ ] **Analisador Léxico:** Tokenização do código-fonte.
-- [ ] **Analisador Sintático:** Construção da Árvore Sintática Abstrata (AST).
-- [ ] **Analisador Semântico:** Verificação de tipos e regras de escopo.
-- [ ] **Gerador de Código Intermediário:** Representação intermediária (IR).
-- [ ] **Otimizador de Código:** Melhorias de performance na IR.
-- [ ] **Geração de Código Final:** Tradução final para arquivos `.go`.
+- [x] **Analisador Léxico:** Tokenização do código-fonte.
+- [x] **Analisador Sintático:** Construção da Árvore Sintática Abstrata (AST).
+- [x] **Analisador Semântico:** Verificação de tipos e regras de escopo.
+- [x] **Geração de Código Go:** Tradução da AST validada para arquivos `.go` (sem IR nem otimizador neste projeto).
 
 ## 🚀 Como Executar (Localmente)
 
@@ -48,7 +46,7 @@ para executar a suite de testes
   bun test
 ```
 
-Os testes unitários usam `bun:test` e ficam ao lado do código-fonte com sufixo `.spec.ts` (ex.: `src/analyzers/Lexycal.analyzer.spec.ts`). Cada fase do compilador deve testar sua lógica pura (ex.: `tokenize`), não o pipeline completo.
+Os testes unitários usam `bun:test` e ficam ao lado do código-fonte com sufixo `.spec.ts` (ex.: `src/analyzers/Lexycal.analyzer.spec.ts`). Cada fase do compilador testa sua lógica pura; o pipeline completo até Go é coberto em `src/Compiler.integration.spec.ts` (ver `docs/Testes.md`).
 
 ## 🚀 Como Executar (Conteiner)
 

@@ -6,6 +6,7 @@ export interface CompilerOptions {
     verbose?: boolean;
     showAst?: boolean;
     showTokens?: boolean;
+    showGo?: boolean;
 }
 /**
  * Classe Compiler principal que gerencia a aplicação
@@ -17,10 +18,16 @@ export interface CompilerOptions {
 export default class Compiler implements ClientInterface {
 
   public analyzers: any[];
+  public generators: any[];
   public tokens: lexicTokens[];
   public ast: ClientInterface["ast"];
   public tabelaSimbolos?: Simbolo[];
+  public errosSintaticos?: string[];
+  public codigoGerado?: string;
   public options: CompilerOptions;
+
+  /** Evita registrar analisadores/geradores duplicados a cada `compile()`. */
+  private carregadoresProntos = false;
 
     /**
      * Construtor da classe Compiler
@@ -28,11 +35,13 @@ export default class Compiler implements ClientInterface {
      */
     constructor(options: CompilerOptions = {}) {
       this.analyzers = [];
+      this.generators = [];
       this.tokens = [];
       this.options = {
             verbose: options.verbose || false,
             showAst: options.showAst || false,
-            showTokens: options.showTokens || false
+            showTokens: options.showTokens || false,
+            showGo: options.showGo || false
         };
     }
     /**
@@ -146,7 +155,12 @@ public async initializeLoaders(
      * @returns boolean indicando sucesso ou falha na compilação.
      */
     public async compile(input: string): Promise<boolean> {
-        await this.initializeLoaders();
+        if (!this.carregadoresProntos) {
+            await this.initializeLoaders();
+            this.carregadoresProntos = true;
+        }
+
+        this.reiniciarEstadoPipeline();
 
         const lexer = this.analyzers.find(a => a.name === "Lexico");
         const parser = this.analyzers.find(a => a.name === "Sintatico");
@@ -167,6 +181,16 @@ public async initializeLoaders(
         this.LOG("Iniciando Análise Semântica...", "COMPILER");
         const semanticoOk = semantic.run();
         if (!semanticoOk) return false;
+
+        const goGenerator = this.generators.find(g => g.output === "go");
+        if (!goGenerator) {
+            this.LOG_ERR("Gerador Go não foi carregado corretamente.", "SYSTEM");
+            return false;
+        }
+
+        this.LOG("Iniciando Geração de Código Go...", "COMPILER");
+        const geracaoOk = goGenerator.run();
+        if (!geracaoOk) return false;
 
         this.LOG("Compilação finalizada com sucesso.", "COMPILER");
         return true;
@@ -231,5 +255,16 @@ public async initializeLoaders(
                 'PERFORMANCE'
             );
         });
+    }
+
+    /**
+     * Limpa artefatos da compilação anterior antes de uma nova execução do pipeline.
+     */
+    private reiniciarEstadoPipeline(): void {
+        this.tokens = [];
+        this.ast = undefined;
+        this.tabelaSimbolos = undefined;
+        this.errosSintaticos = [];
+        this.codigoGerado = undefined;
     }
 }

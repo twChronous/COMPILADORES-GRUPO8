@@ -19,18 +19,14 @@ Analisador sintático (AST)
 Analisador semântico (Tabela de Símbolos e AST validada)
       |
       v
-Representação intermediária (IR)
+Gerador de código Go (AST → `codigoGerado`)
       |
       v
-Otimizador
-      |
-      v
-Gerador de código Go
-      |
-      v
-Código-fonte Go
+Código-fonte Go (`package main` + funções auxiliares)
 
 ```
+
+Neste projeto **não há representação intermediária (IR) nem etapa de otimização**. O `GoGenerator` em `src/generators/` consome a AST tipada diretamente.
 
 O fluxo registra e reporta falhas léxicas, sintáticas ou semânticas. O sistema anota a linha e a coluna exatas de cada erro no código-fonte para facilitar a correção por parte do usuário. Em caso de falha crítica sem recuperação, o sistema interrompe a compilação.
 
@@ -56,23 +52,21 @@ Verifica regras de contexto que a gramática não consegue validar sozinha.
 * **Validação:** Ele infere os tipos de dados e garante a imutabilidade correta de variáveis marcadas como `const`.
 * **Tabela de Símbolos:** A etapa produz uma Tabela de Símbolos persistente. Esta tabela guarda os metadados (nome, modificador, tipo inferido, nível de escopo e localização) de todas as variáveis declaradas.
 
-### Representação Intermediária (IR) e Otimização
+### Gerador de Código Go
 
-|-------------EM CONSTRUÇÃO--------------------|
+Localizado em `src/generators/go.generator.ts`, o gerador percorre a AST validada e emite um arquivo Go completo (`package main`, imports, funções de topo e corpo de `main`). A saída fica em `client.codigoGerado`.
 
-A representação intermediária (IR) descreve as operações do programa de forma independente da sintaxe do JavaScript ou do Go. O otimizador utiliza esta IR para remover operações desnecessárias e otimizar o código final.
+* **Inferência estática:** `go.inference.ts` complementa tipos `any` do semântico para parâmetros e retornos de funções.
+* **Mapeamentos:** `utils/go.constants.ts` define operadores, precedência e traduções (`console.log` → `fmt.Println`, etc.).
+* **Registro:** `Generators.loader.ts` descobre geradores via `generators.registry.ts` (gerado no `prebuild`), no mesmo padrão dos analisadores.
 
-### Gerador de Código
-
-|-------------EM CONSTRUÇÃO--------------------|
-
-Converte a representação intermediária (ou a AST validada) em código-fonte Go. O código gerado respeita a sintaxe e as restrições estáticas da linguagem Go, mas preserva a lógica comportamental do programa JavaScript original.
+Falha em qualquer etapa anterior **interrompe** o pipeline; o gerador não é executado se o sintático ou o semântico retornarem erro.
 
 ## Orquestração e Fluxo de Dados
 
-A classe principal `Compiler` orquestra a execução das etapas do compilador. Ela utiliza carregadores dinâmicos (*Loaders*) para instanciar os analisadores de forma encapsulada.
+A classe principal `Compiler` orquestra a execução das etapas do compilador: léxico → sintático → semântico → gerador Go. Ela utiliza carregadores (*Loaders*) para instanciar analisadores e geradores uma única vez; cada chamada a `compile()` reinicia os artefatos do pipeline (`tokens`, `ast`, `tabelaSimbolos`, `codigoGerado`).
 
-O arquivo `index.ts` serve como ponto de entrada via terminal (CLI). O usuário interage com o compilador passando o arquivo fonte e parâmetros opcionais, como `--verbose` (para ver os logs de execução), `--ast` (para imprimir a árvore gerada) e `--symbols` (para consultar a Tabela de Símbolos final).
+O arquivo `index.ts` serve como ponto de entrada via terminal (CLI). O usuário interage com o compilador passando o arquivo fonte e parâmetros opcionais, como `--verbose` (logs por fase), `--ast`, `--symbols` e `--go` (imprime ou grava o Go gerado).
 
 Detalhes das construções suportadas e as regras de tradução estão disponíveis nos documentos de *Escopo* e *Especificação da Linguagem*.
 

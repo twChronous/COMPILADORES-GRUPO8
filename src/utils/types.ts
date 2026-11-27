@@ -1,9 +1,12 @@
 export interface ClientInterface {
   tokens: lexicTokens[];
   analyzers: AnalyzerModelOptions[];
+  generators?: GeneratorModelOptions[];
   ast?: NoStatement[];
   tabelaSimbolos?: Simbolo[];
+  codigoGo?: string;
   errosSintaticos?: string[];
+  codigoGerado?: string;
   LOG(...args: string[]): void;
   LOG_ERR(...args: string[]): void;
   LOG_WARN(...args: string[]): void;
@@ -28,6 +31,11 @@ export interface LoaderResult {
 
 export interface AnalyzerModelOptions {
   name: string;
+  description: string;
+}
+export interface GeneratorModelOptions {
+  name: string;
+  output: string;
   description: string;
 }
 
