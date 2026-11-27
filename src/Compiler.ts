@@ -22,8 +22,12 @@ export default class Compiler implements ClientInterface {
   public tokens: lexicTokens[];
   public ast: ClientInterface["ast"];
   public tabelaSimbolos?: Simbolo[];
+  public errosSintaticos?: string[];
   public codigoGerado?: string;
   public options: CompilerOptions;
+
+  /** Evita registrar analisadores/geradores duplicados a cada `compile()`. */
+  private carregadoresProntos = false;
 
     /**
      * Construtor da classe Compiler
@@ -151,7 +155,12 @@ public async initializeLoaders(
      * @returns boolean indicando sucesso ou falha na compilação.
      */
     public async compile(input: string): Promise<boolean> {
-        await this.initializeLoaders();
+        if (!this.carregadoresProntos) {
+            await this.initializeLoaders();
+            this.carregadoresProntos = true;
+        }
+
+        this.reiniciarEstadoPipeline();
 
         const lexer = this.analyzers.find(a => a.name === "Lexico");
         const parser = this.analyzers.find(a => a.name === "Sintatico");
@@ -246,5 +255,16 @@ public async initializeLoaders(
                 'PERFORMANCE'
             );
         });
+    }
+
+    /**
+     * Limpa artefatos da compilação anterior antes de uma nova execução do pipeline.
+     */
+    private reiniciarEstadoPipeline(): void {
+        this.tokens = [];
+        this.ast = undefined;
+        this.tabelaSimbolos = undefined;
+        this.errosSintaticos = [];
+        this.codigoGerado = undefined;
     }
 }

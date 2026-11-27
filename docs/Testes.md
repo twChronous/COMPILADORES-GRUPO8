@@ -27,6 +27,12 @@ src/analyzers/Semantical.analyzer.spec.ts
 
 src/analyzers/GoCodegen.analyzer.ts
 src/analyzers/GoCodegen.analyzer.spec.ts
+
+src/generators/go.generator.ts
+src/generators/go.generator.spec.ts
+
+src/Compiler.ts
+src/Compiler.integration.spec.ts
 ```
 
 Não há pasta separada de testes. Essa colocação deixa explícita a relação entre
@@ -39,7 +45,8 @@ método `tokenize` do léxico, a construção da AST no sintático ou a checagem
 escopo/tipos no semântico. Os casos cobrem entradas válidas e erros esperados.
 
 Quando uma construção ainda não está disponível na `main`, o caso correspondente
-pode ficar em `test.skip` até a feature chegar.
+pode ficar em `test.skip` até a feature chegar. O pipeline completo (`Compiler.compile`)
+é testado à parte, em `Compiler.integration.spec.ts`.
 
 ## Analisador léxico
 
@@ -484,6 +491,62 @@ regras de escopo, `tabelaSimbolos` e mensagens de erro. O bloco
 <tr>
 <td>Condição <code>any</code></td>
 <td>Parâmetro de função usado em <code>if</code> e <code>for</code> é aceito</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+
+## Integração — pipeline completo (`Compiler`)
+
+Arquivo de testes: `src/Compiler.integration.spec.ts`.
+
+Exercita `Compiler.compile()` com o carregamento real de analisadores e geradores
+(via `prebuild`). Valida o artefato `codigoGerado` e garante que falhas nas etapas
+anteriores **não** deixam Go parcial de compilações anteriores.
+
+<details>
+<summary>
+  <kbd>▶</kbd>
+  <strong>Casos de teste de integração</strong>
+  <em>(clique para expandir)</em>
+</summary>
+
+<table>
+<thead>
+<tr>
+<th>Caso</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Declarações <code>let</code>/<code>const</code></td>
+<td>Pipeline completo gera <code>package main</code> e corpo tipado em <code>func main</code></td>
+</tr>
+<tr>
+<td>Atribuições compostas</td>
+<td><code>=</code>, <code>+=</code> e <code>-=</code> aparecem no Go emitido</td>
+</tr>
+<tr>
+<td><code>console.log</code></td>
+<td>Inclui <code>import "fmt"</code> e <code>fmt.Println</code></td>
+</tr>
+<tr>
+<td>Função de topo + chamada</td>
+<td>Emite assinatura Go com inferência (<code>func soma(...) float64</code>)</td>
+</tr>
+<tr>
+<td>Erro semântico</td>
+<td><code>compile()</code> retorna <code>false</code> e <code>codigoGerado</code> fica indefinido</td>
+</tr>
+<tr>
+<td>Erro sintático</td>
+<td>Pipeline para no sintático; preenche <code>errosSintaticos</code> sem gerar Go</td>
+</tr>
+<tr>
+<td>Reuso do <code>Compiler</code></td>
+<td>Segunda <code>compile()</code> na mesma instância não duplica loaders e substitui a saída Go</td>
 </tr>
 </tbody>
 </table>
