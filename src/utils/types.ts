@@ -4,6 +4,7 @@ export interface ClientInterface {
   generators?: GeneratorModelOptions[];
   ast?: NoStatement[];
   tabelaSimbolos?: Simbolo[];
+  codigoGo?: string;
   errosSintaticos?: string[];
   codigoGerado?: string;
   LOG(...args: string[]): void;
