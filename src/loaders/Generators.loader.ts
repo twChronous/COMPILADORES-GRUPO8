@@ -1,3 +1,4 @@
+import GeneratorModel from '../models/Generator.model';
 import { ClientInterface } from '../utils/types';
 import { GENERATORS_REGISTRY } from './generators.registry';
 
@@ -39,22 +40,23 @@ export default class GeneratorLoader {
    * Carrega os geradores a partir do registro estático gerado pré-build.
    *
    * @async
+   * @param {any[]} [registry=GENERATORS_REGISTRY] Lista de classes de geradores a registrar.
    * @returns {Promise<{totalGenerators: number, loadTime: number, failedGenerators: string[]}>} Métricas de carregamento.
    */
-  public async load(): Promise<{
+  public async load(registry: any[] = GENERATORS_REGISTRY): Promise<{
     totalGenerators: number;
     loadTime: number;
     failedGenerators: string[];
   }> {
     const startTime = performance.now();
 
-    if (GENERATORS_REGISTRY.length === 0) {
+    if (registry.length === 0) {
       this.client.LOG_WARN('No generator files discovered in registry', this.name);
       return { totalGenerators: 0, loadTime: 0, failedGenerators: [] };
     }
 
     this.client.generators ??= [];
-    const results = GENERATORS_REGISTRY.map((GeneratorClass) =>
+    const results = registry.map((GeneratorClass) =>
       this.registerSingleGenerator(GeneratorClass)
     );
 
@@ -85,10 +87,11 @@ export default class GeneratorLoader {
 
     try {
       const ehConstrutorValido =
-        typeof GeneratorClass === 'function' && GeneratorClass.prototype !== undefined;
+        typeof GeneratorClass === 'function' &&
+        GeneratorClass.prototype instanceof GeneratorModel;
 
       if (!ehConstrutorValido) {
-        throw new Error('Invalid generator class structure');
+        throw new Error('Invalid generator class structure: must extend GeneratorModel');
       }
 
       const generatorInstance = new GeneratorClass(this.client);

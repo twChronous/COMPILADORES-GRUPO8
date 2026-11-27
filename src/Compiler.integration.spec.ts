@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import Compiler from "./Compiler";
+import GeneratorModel from "./models/Generator.model";
 
 async function compilar(codigo: string) {
   const compiler = new Compiler();
@@ -80,5 +81,18 @@ describe("Compiler — integração ponta a ponta (#73)", () => {
     expect(ok2).toBe(true);
     expect(compiler.analyzers.length).toBe(qtdAnalisadores);
     expect(compiler.codigoGerado).toContain("var b float64 = 2");
+  });
+
+  test("carrega apenas instâncias de GeneratorModel com output válido", async () => {
+    const { sucesso, compiler } = await compilar("let x = 1;");
+
+    expect(sucesso).toBe(true);
+    expect(compiler.generators.length).toBeGreaterThan(0);
+    for (const gerador of compiler.generators) {
+      expect(gerador).toBeInstanceOf(GeneratorModel);
+      expect(typeof gerador.output).toBe("string");
+      expect(gerador.output.length).toBeGreaterThan(0);
+    }
+    expect(compiler.generators.some((g) => g.output === "go")).toBe(true);
   });
 });
