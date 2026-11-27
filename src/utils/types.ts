@@ -3,6 +3,7 @@ export interface ClientInterface {
   analyzers: AnalyzerModelOptions[];
   ast?: NoStatement[];
   tabelaSimbolos?: Simbolo[];
+  codigoGo?: string;
   errosSintaticos?: string[];
   LOG(...args: string[]): void;
   LOG_ERR(...args: string[]): void;
