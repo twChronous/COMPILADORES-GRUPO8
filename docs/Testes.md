@@ -24,6 +24,9 @@ src/analyzers/Syntactic.analyzer.spec.ts
 
 src/analyzers/Semantical.analyzer.ts
 src/analyzers/Semantical.analyzer.spec.ts
+
+src/analyzers/GoCodegen.analyzer.ts
+src/analyzers/GoCodegen.analyzer.spec.ts
 ```
 
 Não há pasta separada de testes. Essa colocação deixa explícita a relação entre
@@ -123,7 +126,8 @@ Arquivo de testes: `src/analyzers/Lexycal.analyzer.spec.ts`.
 Arquivo de testes: `src/analyzers/Syntactic.analyzer.spec.ts`.
 
 Os testes passam o código pelo léxico e em seguida pelo sintático, validando a
-AST gerada e as mensagens em `errosSintaticos`.
+AST gerada e as mensagens em `errosSintaticos`. Há um bloco dedicado a
+precedência de operadores e outro a erros de sintaxe no cabeçalho do `for`.
 
 <details>
 <summary>
@@ -157,16 +161,36 @@ AST gerada e as mensagens em `errosSintaticos`.
 <td><code>2 + 3 * 4</code> agrupa a multiplicação antes da adição</td>
 </tr>
 <tr>
-<td>Parênteses</td>
+<td>Parênteses em expressão</td>
 <td><code>(2 + 3) * 4</code> força o agrupamento da soma</td>
 </tr>
 <tr>
 <td>Fatores <code>/</code> e <code>%</code></td>
-<td>Divisão e módulo associam à esquerda na mesma precedência</td>
+<td>Divisão e módulo na mesma faixa de precedência, associativos à esquerda</td>
 </tr>
 <tr>
-<td>Relacional e lógico</td>
-<td><code>(a &gt;= 1) &amp;&amp; (b != 0)</code> com parênteses explícitos</td>
+<td><code>&&</code> e relacional</td>
+<td><code>a &gt;= 0 &amp;&amp; b != 3</code> coloca <code>&&</code> na raiz da expressão</td>
+</tr>
+<tr>
+<td><code>&amp;&amp;</code> vs <code>||</code></td>
+<td><code>a || b &amp;&amp; c</code> e <code>a &amp;&amp; b || c</code> respeitam a ligação mais forte do <code>&amp;&amp;</code></td>
+</tr>
+<tr>
+<td>Relacional vs igualdade</td>
+<td><code>a == b &lt; c</code> agrupa o relacional antes da igualdade</td>
+</tr>
+<tr>
+<td>Aritmética vs relacional</td>
+<td><code>a + 1 &gt; b</code> avalia a soma antes da comparação</td>
+</tr>
+<tr>
+<td>Associatividade de <code>&amp;&amp;</code></td>
+<td><code>a &amp;&amp; b &amp;&amp; c</code> encadeia à esquerda</td>
+</tr>
+<tr>
+<td>Parênteses em lógica</td>
+<td><code>(a || b) &amp;&amp; c</code> e expressões com <code>&gt;=</code>/<code>!=</code> explícitos</td>
 </tr>
 <tr>
 <td><code>if</code>/<code>else</code></td>
@@ -185,6 +209,10 @@ AST gerada e as mensagens em `errosSintaticos`.
 <td>Gera <code>DeclaracaoWhile</code> com condição e corpo</td>
 </tr>
 <tr>
+<td><code>while</code> com <code>&amp;&amp;</code></td>
+<td>Condição com <code>&amp;&amp;</code> e <code>!=</code> na AST</td>
+</tr>
+<tr>
 <td><code>break</code>/<code>continue</code> no <code>while</code></td>
 <td>Reconhece os statements dentro do bloco</td>
 </tr>
@@ -194,7 +222,19 @@ AST gerada e as mensagens em `errosSintaticos`.
 </tr>
 <tr>
 <td><code>for</code> clássico</td>
-<td><em>skip</em> até o parsing do <code>for</code> chegar na <code>main</code></td>
+<td><code>DeclaracaoFor</code> com inicialização, condição, atualização e corpo</td>
+</tr>
+<tr>
+<td><code>for</code> com atribuição na inicialização</td>
+<td>Inicialização como <code>ExpressaoStatement</code> (<code>i = 0</code>)</td>
+</tr>
+<tr>
+<td><code>for (;;)</code></td>
+<td>Três partes do cabeçalho podem ser omitidas</td>
+</tr>
+<tr>
+<td>Erros no <code>for</code></td>
+<td>Falta de <code>;</code>, <code>)</code> ou <code>{</code> registra erro em <code>errosSintaticos</code></td>
 </tr>
 <tr>
 <td>Função sem parâmetros</td>
@@ -232,6 +272,10 @@ AST gerada e as mensagens em `errosSintaticos`.
 <td>Panic Mode</td>
 <td>Recupera após erro e continua a análise das próximas instruções</td>
 </tr>
+<tr>
+<td><code>for</code> clássico (legado)</td>
+<td><em>test.skip</em> — caso duplicado mantido até remoção do skip no spec</td>
+</tr>
 </tbody>
 </table>
 
@@ -241,13 +285,15 @@ AST gerada e as mensagens em `errosSintaticos`.
 
 Arquivo de testes: `src/analyzers/Semantical.analyzer.spec.ts`.
 
-Os testes montam nós AST (ou reutilizam o pipeline léxico → sintático) e verificam
-inferência de tipos, regras de escopo e erros semânticos.
+Os testes montam nós AST (função helper `analisar`) ou reutilizam o pipeline
+léxico → sintático → semântico. Verificam inferência de tipos (`tipoInferido`),
+regras de escopo, `tabelaSimbolos` e mensagens de erro. O bloco
+`SemanticalAnalyzer - laços (for e while)` concentra os casos de laços.
 
 <details>
 <summary>
   <kbd>▶</kbd>
-  <strong>Casos de teste implementados</strong>
+  <strong>Casos de teste implementados (núcleo)</strong>
   <em>(clique para expandir)</em>
 </summary>
 
@@ -317,7 +363,7 @@ inferência de tipos, regras de escopo e erros semânticos.
 </tr>
 <tr>
 <td><code>break</code>/<code>continue</code> fora de laço</td>
-<td>Erro semântico</td>
+<td>Erro semântico no describe principal</td>
 </tr>
 <tr>
 <td><code>console.log</code></td>
@@ -329,15 +375,115 @@ inferência de tipos, regras de escopo e erros semânticos.
 </tr>
 <tr>
 <td>Pipeline léxico → sintático → semântico</td>
-<td><code>run</code> consome a AST e tipa o programa</td>
+<td><code>run</code> consome a AST e preenche <code>tabelaSimbolos</code></td>
 </tr>
 <tr>
-<td>Semântica do <code>while</code></td>
-<td><em>skip</em> até a verificação do laço chegar na <code>main</code></td>
+<td>Pipeline com função e <code>return</code></td>
+<td>Programa completo passa pelas três etapas</td>
 </tr>
 <tr>
-<td>Semântica do <code>for</code></td>
-<td><em>skip</em> até parsing e verificação do <code>for</code> chegarem na <code>main</code></td>
+<td>Laços <code>while</code>/<code>for</code> (legado no describe principal)</td>
+<td>Quatro <em>test.skip</em> aguardando remoção (substituídos pela suite de laços)</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+
+<details>
+<summary>
+  <kbd>▶</kbd>
+  <strong>Casos de teste — laços <code>for</code> e <code>while</code></strong>
+  <em>(clique para expandir)</em>
+</summary>
+
+<table>
+<thead>
+<tr>
+<th>Caso</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>for</code> válido</td>
+<td>Laço clássico com <code>let</code> na inicialização é aceito</td>
+</tr>
+<tr>
+<td>Escopo do <code>for</code></td>
+<td>Variável da inicialização visível na condição, atualização e corpo</td>
+</tr>
+<tr>
+<td><code>for (;;)</code></td>
+<td>Cabeçalho vazio com <code>break</code> no corpo</td>
+</tr>
+<tr>
+<td>Inicialização por expressão</td>
+<td><code>for (i = 0; ...)</code> usa variável já declarada</td>
+</tr>
+<tr>
+<td><code>break</code>/<code>continue</code> no <code>for</code></td>
+<td>Permitidos dentro do corpo do laço</td>
+</tr>
+<tr>
+<td>Laços consecutivos</td>
+<td>Reutiliza o nome <code>i</code> em dois <code>for</code> seguidos</td>
+</tr>
+<tr>
+<td>Tipo na inicialização</td>
+<td>Anota <code>tipoInferido</code> da variável do cabeçalho</td>
+</tr>
+<tr>
+<td>Condição não booleana</td>
+<td><code>for (let i = 0; 1; ...)</code> lança erro</td>
+</tr>
+<tr>
+<td>Variável do laço não vaza</td>
+<td><code>i</code> do <code>for</code> não existe após o laço</td>
+</tr>
+<tr>
+<td>Condição/atualização inválidas</td>
+<td>Identificador não declarado em condição ou em <code>+=</code> gera erro</td>
+</tr>
+<tr>
+<td><code>const</code> no <code>for</code></td>
+<td>Erro ao atualizar variável <code>const</code> no cabeçalho</td>
+</tr>
+<tr>
+<td>Atualização incompatível</td>
+<td><code>i += "a"</code> rejeitado</td>
+</tr>
+<tr>
+<td>Sombreamento no corpo</td>
+<td>Variável externa homônima e <code>let</code> interno no corpo</td>
+</tr>
+<tr>
+<td>Corpo inválido</td>
+<td>Uso de variável não declarada no corpo lança erro</td>
+</tr>
+<tr>
+<td><code>break</code>/<code>continue</code> fora de laço</td>
+<td>Erro na suite de laços (complementa o describe principal)</td>
+</tr>
+<tr>
+<td><code>break</code> em função aninhada</td>
+<td>Erro quando <code>break</code> está dentro de <code>function</code> no corpo do laço</td>
+</tr>
+<tr>
+<td><code>while</code> válido</td>
+<td>Laço com <code>break</code> condicional aceito</td>
+</tr>
+<tr>
+<td><code>while</code> não booleano</td>
+<td>Condição numérica lança erro</td>
+</tr>
+<tr>
+<td>Corpo do <code>while</code></td>
+<td>Variável não declarada no corpo lança erro</td>
+</tr>
+<tr>
+<td>Condição <code>any</code></td>
+<td>Parâmetro de função usado em <code>if</code> e <code>for</code> é aceito</td>
 </tr>
 </tbody>
 </table>
