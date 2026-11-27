@@ -1,113 +1,91 @@
-# Compilador JavaScript para Go
+# Compilador JavaScript → Go
 
-Este projeto consiste no desenvolvimento de um compilador básico que traduz código da linguagem **JavaScript** (baseado no padrão ECMAScript TC39) para a linguagem **Go** (Golang). 
+Repositório do compilador JavaScript para Go do Grupo 8. Toda a especificação técnica está concentrada em [docs/](./docs/README.md) e os exemplos práticos em [examples/](./examples/README.md).
 
-Este é um projeto contínuo, desenvolvido ao longo do semestre para a disciplina de Compiladores.
+[Documentação](./docs/README.md) · [Escopo](./docs/Escopo.md) · [Arquitetura](./docs/Arquitetura.md) · [Sintático](./docs/Sintatico.md) · [Semântico](./docs/Semantico.md) · [Tradução JS → Go](./docs/Traducao.md) · [Testes](./docs/Testes.md) · [Exemplos](./examples/README.md)
 
-## 📚 Documentação Técnica
+## Instalação
 
-Este README serve como visão geral do projeto. Para informações detalhadas sobre as regras adotadas, gramática e decisões de design, consulte nossa documentação:
+Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/twChronous/COMPILADORES-GRUPO8/releases):
 
-* [Especificação da Linguagem e Escopo](./docs/README.md)
+- **Linux:** `compilador-linux`
+- **Windows:** `compilador-windows.exe`
+- **macOS:** `compilador-macos-intel` ou `compilador-macos-silicon`
 
-## 🗺️ Roadmap de Desenvolvimento
-
-O progresso do compilador seguirá as etapas clássicas de compilação:
-
-- [x] **Analisador Léxico:** Tokenização do código-fonte.
-- [x] **Analisador Sintático:** Construção da Árvore Sintática Abstrata (AST).
-- [x] **Analisador Semântico:** Verificação de tipos e regras de escopo.
-- [x] **Geração de Código Go:** Tradução da AST validada para arquivos `.go` (sem IR nem otimizador neste projeto).
-
-
-### Gerando código Go
-
-Para traduzir um arquivo JavaScript para Go, utilize a flag `--output`:
+No Linux ou macOS, dê permissão de execução ao binário antes de rodar:
 
 ```bash
-bun start arquivo.js --output saida.go
+chmod +x compilador-linux
 ```
 
-As opções `--out` e `-o` também são aceitas.
+## Como executar
 
-Para visualizar o código Go diretamente no terminal:
+Formato geral da CLI (substitua `./compilador-linux` por `compilador-windows.exe` no Windows ou pelo binário do macOS):
 
 ```bash
-bun start arquivo.js --go
+./compilador-linux [arquivo.js] [saida.go] [opcoes]
 ```
 
-Para executar o código gerado, é necessário ter o Go instalado:
+**Comportamento das opções:**
+
+- **Sem flags nem `<saida>.go`:** valida e compila silenciosamente (não imprime nem gera arquivos; retorna código `1` se houver erro).
+- **`<saida>.go` (ou `-o`, `--out`, `--output <arquivo>`):** grava o código Go no caminho informado.
+- **`--go`:** imprime o código Go gerado no terminal.
+- **`--json [arquivo.json]`:** salva o output da compilação em JSON (padrão: `output.json`). Pode ser combinado com `--tokens`, `--ast`, `--ts` e `--go` para filtrar os campos gravados.
+- **`--tokens`, `--ast`, `--ts`, `--verbose`, `-h` / `--help`:** inspeção de etapas, logs detalhados e ajuda.
+
+Exemplos:
+
+```bash
+# Gerar arquivo .go diretamente (ou usando --output / --out / -o)
+./compilador-linux entrada.js saida.go
+./compilador-linux entrada.js --output saida.go
+
+# Imprimir Go no terminal
+./compilador-linux entrada.js --go
+
+# Salvar artefatos em JSON (completo ou filtrado)
+./compilador-linux entrada.js --json
+./compilador-linux entrada.js --ast --tokens --json relatorio.json
+
+# Exibir ajuda
+./compilador-linux --help
+```
+
+Para executar ou compilar o `.go` gerado, é necessário ter o **Go** instalado:
 
 ```bash
 go run saida.go
+go build -o programa saida.go
 ```
 
-Para compilar um executável:
+Mais exemplos prontos em [examples/README.md](./examples/README.md).
+
+## Ambiente de desenvolvimento
+
+**Pré-requisitos:** [Bun](https://bun.sh/) (`>= 1.4.0`), **Go** (opcional, para rodar os arquivos `.go` gerados) e **Docker** (opcional).
 
 ```bash
-go build -o saida.exe saida.go
+bun install                          # Instala as dependências
+bun start [arquivo.js] [saida.go]    # Executa prebuild (registries) + src/index.ts
+bun test                             # Executa a suíte de testes (ver docs/Testes.md)
+bunx tsc --noEmit                    # Valida a tipagem TypeScript
+bun run build-comp                   # Gera o binário standalone em ./dist/compilador
 ```
 
-Consulte os [exemplos de compilação JavaScript para Go](./examples/README.md) para obter instruções detalhadas e exemplos das funcionalidades suportadas.
+Na execução em desenvolvimento, `bun start` passa as mesmas flags da CLI diretamente para `src/index.ts` (ex.: `bun start examples/funcoes.js --go`).
 
-
-## 🚀 Como Executar (Localmente)
-
-**Pré-requisitos:**
-* Node JS (versão 24.20.0 ou superior)
-* BunJS (versão 1.4.0 ou superior)
-
-para executar normalmente
-```bash
-  bun start
-```
-para executar com logs
-```bash
-  bun start --verbose
-```
-para imprimir a AST na execução 
-```bash
-  bun start --ast
-```
-para abrir o modo de uso
-```bash
-  bun start --help
-```
-para executar a suite de testes
-```bash
-  bun test
-```
-
-Os testes unitários usam `bun:test` e ficam ao lado do código-fonte com sufixo `.spec.ts` (ex.: `src/analyzers/Lexycal.analyzer.spec.ts`). Cada fase do compilador testa sua lógica pura; o pipeline completo até Go é coberto em `src/Compiler.integration.spec.ts` (ver `docs/Testes.md`).
-
-## 🚀 Como Executar (Conteiner)
-
-**Pré-requisitos:**
-* Docker (versão 29.7.2, ou superior)
+### Docker
 
 ```bash
-  docker build -t compilador .
+docker build -t compilador .
+docker run --rm compilador start --go
+docker run --rm compilador test
 ```
 
-para executar em modo hot reload 
-```bash
-  docker run --rm -v $(pwd):/app compilador run --hot index.ts
-```
+## Contribuindo
 
-para executar a suite de testes 
-```bash
-  docker run --rm compilador test
-```
-
-para executar passando argumentos
-```bash
-  # Isso equivale a rodar `bun start --input 'aaaaaa'`
-  docker run --rm compilador start --input 'aaaaaa'
-```
-## 🤝 Contribuindo 
-
-1.  Execute o comando ``git pull``.
-2.  Crie uma Branch para sua Feature (`git checkout -b feature/MinhaNovaFeature`).
-3.  Commit suas mudanças (`git commit -m 'Adiciona MinhaNovaFeature'`).
-4.  Push para a Branch (`git push origin feature/MinhaNovaFeature`).
-5.  Abra um Pull Request.
+1. Atualize sua base com `git pull`.
+2. Crie uma branch para sua alteração (`git checkout -b feature/MinhaAlteracao`).
+3. Faça commit e push das mudanças.
+4. Abra um Pull Request para a `main`.
