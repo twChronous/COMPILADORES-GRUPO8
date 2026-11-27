@@ -23,6 +23,8 @@ const PREFIXOS_SAIDA_GO = ["-o=", "--out=", "--output="];
  */
 export function parseCliArgs(listaArgs: string[]): CliOptions {
   const indicesConsumidos = new Set<number>();
+  const flagsSaida = ["--output", "--out", "-o"];
+
   let arquivoSaida: string | undefined;
   let arquivoJson: string | undefined;
   let saveJson = false;
@@ -178,25 +180,30 @@ export async function run(listaArgs: string[] = process.argv.slice(2)): Promise<
     }
   } else {
     if (verbose) {
-      console.log("\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback).");
+      console.log(
+        "\x1b[33m[INFO]\x1b[0m Nenhum arquivo .js detectado. Utilizando o bloco de código interno (fallback)."
+      );
     }
+
     input = `
       let x = 10 + 20;
 
       if (x > 10) {
         x = x + 1;
       }
+
       console.log("test")
 
       function soma(a,b) {
         return a + b;
       }
+
       x = soma(1,2)
       let j = null
       let y = null
 
-      while(j != y) { 
-        break; 
+      while(j != y) {
+        break;
       }
     `;
   }
