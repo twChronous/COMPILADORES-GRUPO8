@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import GoGenerator from "./go.generator";
 import LexAnalyzer from "../analyzers/Lexycal.analyzer";
 import SyntacticAnalyzer from "../analyzers/Syntactic.analyzer";
@@ -464,4 +467,178 @@ describe("GoGenerator - run() e pipeline completo", () => {
       ].join("\n")
     );
   });
+});
+
+
+const temGo = Bun.which("go") !== null;
+
+/**
+ * Compila o código Go gerado e, opcionalmente, executa-o. Se o Go não compilar, o teste falha
+ * mostrando o erro do compilador e o código gerado.
+ */
+function compilarGo(codigoGo: string, executar: boolean): string {
+  const pasta = mkdtempSync(path.join(tmpdir(), "go-gerado-"));
+  try {
+    writeFileSync(path.join(pasta, "main.go"), codigoGo);
+    const comando = executar ? ["go", "run", "main.go"] : ["go", "build", "-o", path.join(pasta, "saida"), "main.go"];
+    const resultado = Bun.spawnSync(comando, { cwd: pasta });
+
+    if (resultado.exitCode !== 0) {
+      throw new Error(`O Go não compilou o código gerado:\n${resultado.stderr.toString()}\n${codigoGo}`);
+    }
+    return resultado.stdout.toString();
+  } finally {
+    rmSync(pasta, { recursive: true, force: true });
+  }
+}
+
+describe("GoGenerator - tipos das funções", () => {
+  test("deduz os tipos dos parâmetros e do retorno a partir das chamadas", () => {
+    const codigo = gerarDoCodigo(`
+      function soma(a, b) { return a + b; }
+      console.log(soma(1, 2));
+    `);
+
+    expect(codigo).toContain("func soma(a float64, b float64) float64 {\n\treturn a + b\n}");
+  });
+
+  test("aceita múltiplos parâmetros de tipos diferentes", () => {
+    const codigo = gerarDoCodigo(`
+      function repetir(texto, vezes) { return texto; }
+      console.log(repetir("oi", 3));
+    `);
+
+    expect(codigo).toContain("func repetir(texto string, vezes float64) string {");
+  });
+
+  test("propaga tipos entre funções que chamam outras funções", () => {
+    const codigo = gerarDoCodigo(`
+      function soma(a, b) { return a + b; }
+      function dobroDaSoma(x, y) { return soma(x, y) * 2; }
+      console.log(dobroDaSoma(1, 2));
+    `);
+
+    expect(codigo).toContain("func soma(a float64, b float64) float64 {");
+    expect(codigo).toContain("func dobroDaSoma(x float64, y float64) float64 {");
+  });
+
+  test("usa o retorno deduzido da função ao tipar a variável que recebe o resultado", () => {
+    const codigo = gerarDoCodigo(`
+      function nome() { return "ana"; }
+      let n = nome();
+      console.log(n);
+    `);
+
+    expect(codigo).toContain("var n string = nome()");
+  });
+
+  test("deduz retorno booleano de comparações", () => {
+    const codigo = gerarDoCodigo(`
+      function maior(a, b) { return a > b; }
+      console.log(maior(2, 1));
+    `);
+
+    expect(codigo).toContain("func maior(a float64, b float64) bool {");
+  });
+
+  test("mantém any quando nenhuma chamada permite descobrir o tipo do parâmetro", () => {
+    const codigo = gerarDoCodigo(`
+      function mostrar(x) { console.log(x); }
+    `);
+
+    expect(codigo).toContain("func mostrar(x any) {");
+  });
+
+  test("usa any no retorno quando os return da função discordam de tipo", () => {
+    const codigo = gerarDoCodigo(`
+      function f() { return 1; return "a"; }
+      console.log(f());
+    `);
+
+    expect(codigo).toContain("func f() any {");
+  });
+});
+
+describe("GoGenerator - return", () => {
+  test("return vazio em função sem valor continua sendo apenas return", () => {
+    const codigo = gerarDoCodigo(`
+      function parar() { console.log("a"); return; }
+      parar();
+    `);
+
+    expect(codigo).toContain('func parar() {\n\tfmt.Println("a")\n\treturn\n}');
+  });
+
+  test("return vazio em função que também retorna valor devolve o valor zero do tipo", () => {
+    const codigo = gerarDoCodigo(`
+      function f(x) { return x; return; }
+      console.log(f(1));
+    `);
+
+    expect(codigo).toContain("func f(x float64) float64 {\n\treturn x\n\treturn 0\n}");
+  });
+
+  test("completa com o valor zero quando a função com retorno não termina em return", () => {
+    const codigo = gerarDoCodigo(`
+      function f(x) { return x; console.log(x); }
+      console.log(f(1));
+    `);
+
+    expect(codigo).toContain("\tfmt.Println(x)\n\treturn 0\n}");
+  });
+});
+
+describe("GoGenerator - console.log", () => {
+  test("importa fmt quando console.log aparece apenas dentro de uma função", () => {
+    const codigo = gerarDoCodigo(`
+      function ola() { console.log("oi"); }
+      ola();
+    `);
+
+    expect(codigo).toContain('import "fmt"');
+    expect(codigo).toContain('func ola() {\n\tfmt.Println("oi")\n}');
+  });
+
+  test("não importa fmt quando console.log não é usado", () => {
+    const codigo = gerarDoCodigo(`
+      function dobro(x) { return x * 2; }
+      let r = dobro(2);
+    `);
+
+    expect(codigo).not.toContain("fmt");
+  });
+});
+
+describe("GoGenerator - o Go gerado compila", () => {
+  test.skipIf(!temGo)("recursão simples e múltiplos parâmetros compilam com os tipos deduzidos", () => {
+    const codigo = gerarDoCodigo(`
+      function fatorial(n) { return n * fatorial(n - 1); }
+      function potencia(base, expoente) { return base * potencia(base, expoente - 1); }
+      console.log(fatorial(5), potencia(2, 10));
+    `);
+
+    expect(codigo).toContain("func fatorial(n float64) float64 {");
+    expect(codigo).toContain("func potencia(base float64, expoente float64) float64 {");
+    compilarGo(codigo, false);
+  }, 60_000);
+
+  test.skipIf(!temGo)("funções, return e console.log executam com a mesma saída do JavaScript", () => {
+    const codigo = gerarDoCodigo(`
+      function soma(a, b) { return a + b; }
+      function media(a, b) { return (a + b) / 2; }
+      function dobroDaSoma(x, y) { return soma(x, y) * 2; }
+      function saudar(nome) {
+        console.log("Olá,", nome);
+        return;
+      }
+      function ehMaior(a, b) { return a > b; }
+
+      let r = soma(2, 3);
+      saudar("mundo");
+      console.log(r, media(1, 2), dobroDaSoma(1, 2));
+      console.log(ehMaior(3, 2), ehMaior(1, 2));
+    `);
+
+    expect(compilarGo(codigo, true)).toBe("Olá, mundo\n5 1.5 6\ntrue false\n");
+  }, 60_000);
 });
