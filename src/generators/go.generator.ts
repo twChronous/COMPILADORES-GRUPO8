@@ -14,9 +14,12 @@ import {
   NoExpressao,
   NoStatement,
   TipoSemantico,
+  NoDeclaracaoIf,
   NoAcessoMembro,
+  NoDeclaracaoFor,
   NoChamadaFuncao,
   ClientInterface,
+  NoDeclaracaoWhile,
   NoReturnStatement,
   NoExpressaoBinaria,
   NoDeclaracaoFuncao,
@@ -30,19 +33,25 @@ export default class GoGenerator extends GeneratorModel {
   private imports: Set<string> = new Set();
 
   private readonly formatadoresLiteral: Record<NoLiteral["tipoDado"], (valor: string) => string> = {
+    NULL: () => "nil",
+    UNDEFINED: () => "nil",
     NUMERO: (valor) => valor,
     BOOLEAN: (valor) => valor,
     STRING: (valor) => `"${this.escaparString(valor)}"`,
-    NULL: () => "nil",
-    UNDEFINED: () => "nil",
   };
 
   private readonly geradoresStatement: Partial<{
     [K in NoStatement["tipo"]]: (stmt: Extract<NoStatement, { tipo: K }>, nivel: number) => string;
   }> = {
+    Bloco: (stmt, nivel) => this.gerarBloco(stmt, nivel),
+    DeclaracaoIf: (stmt, nivel) => this.gerarIf(stmt, nivel),
+    DeclaracaoFor: (stmt, nivel) => this.gerarFor(stmt, nivel),
+    DeclaracaoWhile: (stmt, nivel) => this.gerarWhile(stmt, nivel),
+    ReturnStatement: (stmt, nivel) => this.gerarReturn(stmt, nivel),
+    BreakStatement: (_stmt, nivel) => `${this.indentar(nivel)}break`,
+    ContinueStatement: (_stmt, nivel) => `${this.indentar(nivel)}continue`,
     DeclaracaoVariavel: (stmt, nivel) => this.gerarDeclaracaoVariavel(stmt, nivel),
     ExpressaoStatement: (stmt, nivel) => `${this.indentar(nivel)}${this.gerarExpressao(stmt.expressao)}`,
-    ReturnStatement: (stmt, nivel) => this.gerarReturn(stmt, nivel),
     DeclaracaoFuncao: (stmt) => {
       throw new Error(
         `Erro de Geração [Linha ${stmt.linha}]: Declaração de função aninhada '${stmt.nome}' não suportada em Go.`
@@ -53,21 +62,20 @@ export default class GoGenerator extends GeneratorModel {
   private readonly geradoresExpressao: {
     [K in NoExpressao["tipo"]]: (expr: Extract<NoExpressao, { tipo: K }>) => string;
   } = {
-    Literal: (expr) => this.formatadoresLiteral[expr.tipoDado](expr.valor),
     Identificador: (expr) => expr.nome,
-    ExpressaoBinaria: (expr) => this.gerarExpressaoBinaria(expr),
     AcessoMembro: (expr) => this.gerarAcessoMembro(expr),
     ChamadaFuncao: (expr) => this.gerarChamadaFuncao(expr),
+    ExpressaoBinaria: (expr) => this.gerarExpressaoBinaria(expr),
+    Literal: (expr) => this.formatadoresLiteral[expr.tipoDado](expr.valor),
   };
 
   private readonly extratoresBloco: Partial<{
     [K in NoStatement["tipo"]]: (stmt: Extract<NoStatement, { tipo: K }>) => NoBloco[];
   }> = {
     Bloco: (stmt) => [stmt],
-    DeclaracaoIf: (stmt) =>
-      stmt.alternativa ? [stmt.consequencia, stmt.alternativa] : [stmt.consequencia],
-    DeclaracaoWhile: (stmt) => [stmt.corpo],
     DeclaracaoFor: (stmt) => [stmt.corpo],
+    DeclaracaoWhile: (stmt) => [stmt.corpo],
+    DeclaracaoIf: (stmt) => stmt.alternativa ? [stmt.consequencia, stmt.alternativa] : [stmt.consequencia],
   };
 
   /**
@@ -189,11 +197,11 @@ export default class GoGenerator extends GeneratorModel {
    */
   private escaparString(valor: string): string {
     return valor
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t");
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t")
+    .replace(/\\/g, "\\\\");
   }
 
   /**
@@ -237,6 +245,111 @@ export default class GoGenerator extends GeneratorModel {
   }
 
   /**
+   * Formata os comandos internos de um bloco, incluindo as quebras de linha
+   * e a indentação final para o fechamento da chave `}`.
+   *
+   * @param bloco Bloco da AST a ser formatado.
+   * @param nivel Nível de indentação do cabeçalho que abre o bloco.
+   * @returns Conteúdo interno entre `{` e `}`.
+   */
+  private gerarCorpoBloco(bloco: NoBloco, nivel: number): string {
+    if (bloco.corpo.length === 0) {
+      return `\n${this.indentar(nivel)}`;
+    }
+
+    const linhas = bloco.corpo.map((stmt) => this.gerarStatement(stmt, nivel + 1));
+    return `\n${linhas.join("\n")}\n${this.indentar(nivel)}`;
+  }
+
+  /**
+   * Gera um bloco avulso delimitado por chaves em Go.
+   *
+   * @param no Nó `Bloco` da AST.
+   * @param nivel Nível de indentação atual.
+   * @returns Bloco formatado em Go.
+   */
+  private gerarBloco(no: NoBloco, nivel: number): string {
+    return `${this.indentar(nivel)}{${this.gerarCorpoBloco(no, nivel)}}`;
+  }
+
+  /**
+   * Gera uma estrutura condicional `if` / `else` idiomática em Go.
+   *
+   * @param no Nó `DeclaracaoIf` da AST.
+   * @param nivel Nível de indentação atual.
+   * @returns Condicional `if` (e `else` opcional) em Go.
+   */
+  private gerarIf(no: NoDeclaracaoIf, nivel: number): string {
+    const condicao = this.gerarExpressao(no.condicao);
+    const consequencia = `{${this.gerarCorpoBloco(no.consequencia, nivel)}}`;
+    const alternativa = no.alternativa
+      ? ` else {${this.gerarCorpoBloco(no.alternativa, nivel)}}`
+      : "";
+
+    return `${this.indentar(nivel)}if ${condicao} ${consequencia}${alternativa}`;
+  }
+
+  /**
+   * Gera um laço `while` traduzido para o `for` condicional idiomático em Go.
+   *
+   * @param no Nó `DeclaracaoWhile` da AST.
+   * @param nivel Nível de indentação atual.
+   * @returns Laço `for <condicao> { ... }` em Go.
+   */
+  private gerarWhile(no: NoDeclaracaoWhile, nivel: number): string {
+    const condicao = this.gerarExpressao(no.condicao);
+    return `${this.indentar(nivel)}for ${condicao} {${this.gerarCorpoBloco(no.corpo, nivel)}}`;
+  }
+
+  /**
+   * Traduz a cláusula de inicialização de um laço `for` para a sintaxe Go (`:=` ou atribuição).
+   *
+   * @param init Nó de inicialização do laço `for`.
+   * @returns Expressão ou declaração curta formatada para o cabeçalho do `for`.
+   */
+  private gerarInicializacaoFor(init: NoDeclaracaoFor["inicializacao"]): string {
+    if (!init) return "";
+
+    if (init.tipo === "DeclaracaoVariavel") {
+      return `${init.nome} := ${this.gerarExpressao(init.valorInicial)}`;
+    }
+
+    return this.gerarExpressao(init.expressao);
+  }
+
+  /**
+   * Monta o cabeçalho do laço `for` em Go cobrindo `for`, `for cond` e `for init; cond; atual`.
+   *
+   * @param no Nó `DeclaracaoFor` da AST.
+   * @returns Trecho do cabeçalho entre `for` e `{`.
+   */
+  private formatarCabecalhoFor(no: NoDeclaracaoFor): string {
+    const init = this.gerarInicializacaoFor(no.inicializacao);
+    const cond = no.condicao ? this.gerarExpressao(no.condicao) : "";
+    const atual = no.atualizacao ? this.gerarExpressao(no.atualizacao) : "";
+
+    if (!init && !cond && !atual) return "";
+    if (!init && cond && !atual) return ` ${cond}`;
+
+    const parte1 = `${init};`;
+    const parte2 = cond ? ` ${cond};` : " ;";
+    const parte3 = atual ? ` ${atual}` : "";
+
+    return ` ${parte1}${parte2}${parte3}`;
+  }
+
+  /**
+   * Gera um laço `for` completo em Go a partir de `NoDeclaracaoFor`.
+   *
+   * @param no Nó `DeclaracaoFor` da AST.
+   * @param nivel Nível de indentação atual.
+   * @returns Laço `for` formatado em Go.
+   */
+  private gerarFor(no: NoDeclaracaoFor, nivel: number): string {
+    return `${this.indentar(nivel)}for${this.formatarCabecalhoFor(no)} {${this.gerarCorpoBloco(no.corpo, nivel)}}`;
+  }
+
+  /**
    * Gera uma função de nível de pacote em Go a partir de `NoDeclaracaoFuncao`.
    *
    * @param no Nó de declaração de função da AST.
@@ -246,10 +359,8 @@ export default class GoGenerator extends GeneratorModel {
     const parametros = no.parametros.map((p) => `${p.nome} any`).join(", ");
     const tipoRetorno = this.inferirRetornoFuncao(no.corpo);
     const assinaturaRetorno = tipoRetorno ? ` ${tipoRetorno}` : "";
-    const linhasCorpo = no.corpo.corpo.map((stmt) => this.gerarStatement(stmt, 1));
-    const corpoFormatado = linhasCorpo.length > 0 ? `\n${linhasCorpo.join("\n")}\n` : "\n";
 
-    return `func ${no.nome}(${parametros})${assinaturaRetorno} {${corpoFormatado}}`;
+    return `func ${no.nome}(${parametros})${assinaturaRetorno} {${this.gerarCorpoBloco(no.corpo, 0)}}`;
   }
 
   /**

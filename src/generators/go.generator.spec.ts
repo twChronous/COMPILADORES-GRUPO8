@@ -412,22 +412,16 @@ describe("GoGenerator - run() e pipeline completo", () => {
     expect(erros[0]).toMatch(/AST ausente/);
   });
 
-  test("run() retorna false e registra erro quando encontra comando ainda não suportado", () => {
+  test("run() retorna false e registra erro quando encontra falha durante a geração", () => {
     const erros: string[] = [];
     const client = cliente((msg) => erros.push(msg));
-    client.ast = [
-      {
-        tipo: "BreakStatement",
-        linha: 3,
-        coluna: 1,
-      },
-    ];
+    client.ast = [funcao("externa", [], [funcao("interna", [], [])])];
 
     const gerador = new GoGenerator(client);
 
     expect(gerador.run()).toBe(false);
     expect(erros.length).toBe(1);
-    expect(erros[0]).toMatch(/Comando 'BreakStatement' ainda não implementado/);
+    expect(erros[0]).toMatch(/Declaração de função aninhada 'interna' não suportada/);
   });
 
   test("pipeline completo (Lex -> Syntactic -> Semantical -> GoGenerator) gera código Go válido", () => {
@@ -463,5 +457,230 @@ describe("GoGenerator - run() e pipeline completo", () => {
         "}",
       ].join("\n")
     );
+  });
+});
+
+describe("GoGenerator - controle de fluxo (if/else, while, for, break, continue)", () => {
+  test("traduz if sem else e if/else em blocos Go idiomáticos", () => {
+    const codigoGo = gerarDoCodigo(`
+      let x = 15;
+      if (x > 10) {
+        x = x + 1;
+      }
+      if (x == 16) {
+        x = 0;
+      } else {
+        x = 1;
+      }
+    `);
+
+    expect(codigoGo).toBe(
+      [
+        "package main",
+        "",
+        "func main() {",
+        "\tvar x float64 = 15",
+        "\tif x > 10 {",
+        "\t\tx = x + 1",
+        "\t}",
+        "\tif x == 16 {",
+        "\t\tx = 0",
+        "\t} else {",
+        "\t\tx = 1",
+        "\t}",
+        "}",
+      ].join("\n")
+    );
+  });
+
+  test("traduz while com break e continue para for condicional em Go", () => {
+    const codigoGo = gerarDoCodigo(`
+      let n = 0;
+      while (n < 5) {
+        n += 1;
+        if (n == 2) {
+          continue;
+        }
+        if (n > 3) {
+          break;
+        }
+      }
+    `);
+
+    expect(codigoGo).toBe(
+      [
+        "package main",
+        "",
+        "func main() {",
+        "\tvar n float64 = 0",
+        "\tfor n < 5 {",
+        "\t\tn += 1",
+        "\t\tif n == 2 {",
+        "\t\t\tcontinue",
+        "\t\t}",
+        "\t\tif n > 3 {",
+        "\t\t\tbreak",
+        "\t\t}",
+        "\t}",
+        "}",
+      ].join("\n")
+    );
+  });
+
+  test("traduz for clássico com declaração curta :=, atribuição e atualização +=", () => {
+    const codigoGo = gerarDoCodigo(`
+      let total = 0;
+      for (let i = 0; i < 3; i += 1) {
+        total += i;
+      }
+      let j = 0;
+      for (j = 1; j < 4; j += 1) {
+        total += j;
+      }
+    `);
+
+    expect(codigoGo).toBe(
+      [
+        "package main",
+        "",
+        "func main() {",
+        "\tvar total float64 = 0",
+        "\tfor i := 0; i < 3; i += 1 {",
+        "\t\ttotal += i",
+        "\t}",
+        "\tvar j float64 = 0",
+        "\tfor j = 1; j < 4; j += 1 {",
+        "\t\ttotal += j",
+        "\t}",
+        "}",
+      ].join("\n")
+    );
+  });
+
+  test("traduz for (;;) e omissão parcial de cláusulas no cabeçalho do for", () => {
+    const codigoGo = gerarDoCodigo(`
+      for (;;) {
+        break;
+      }
+      let k = 0;
+      for (; k < 2; k += 1) {
+        continue;
+      }
+      for (let m = 0; ; m += 1) {
+        break;
+      }
+    `);
+
+    expect(codigoGo).toContain("\tfor {\n\t\tbreak\n\t}");
+    expect(codigoGo).toContain("\tfor ; k < 2; k += 1 {\n\t\tcontinue\n\t}");
+    expect(codigoGo).toContain("\tfor m := 0; ; m += 1 {\n\t\tbreak\n\t}");
+  });
+
+  test("traduz bloco avulso mantendo indentação correta", () => {
+    const gerador = new GoGenerator(cliente());
+    const codigo = gerador.gerar([
+      bloco([decl("let", "interno", num("7", "number"), "number")]),
+    ]);
+
+    expect(codigo).toBe(
+      [
+        "package main",
+        "",
+        "func main() {",
+        "\t{",
+        "\t\tvar interno float64 = 7",
+        "\t}",
+        "}",
+      ].join("\n")
+    );
+  });
+
+  test("emite if/else com blocos vazios, condição composta e sem ponto e vírgula", () => {
+    const codigoGo = gerarDoCodigo(`
+      let a = 1;
+      let b = 2;
+      if (a >= 0 && b != 3) {
+      } else {
+      }
+    `);
+
+    expect(codigoGo).toContain("\tif a >= 0 && b != 3 {\n\t} else {\n\t}");
+    expect(codigoGo).not.toContain("if (");
+    expect(codigoGo).not.toContain(";");
+  });
+
+  test("infere retorno de função com return dentro de if/else", () => {
+    const codigoGo = gerarDoCodigo(`
+      function sinal(n) {
+        if (n > 0) {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    `);
+
+    expect(codigoGo).toBe(
+      [
+        "package main",
+        "",
+        "func sinal(n any) float64 {",
+        "\tif n > 0 {",
+        "\t\treturn 1",
+        "\t} else {",
+        "\t\treturn 0",
+        "\t}",
+        "}",
+        "",
+        "func main() {",
+        "}",
+      ].join("\n")
+    );
+  });
+
+  test("traduz while com condição composta e decremento -= para for idiomático", () => {
+    const codigoGo = gerarDoCodigo(`
+      let a = 5;
+      let b = 0;
+      while (a >= 0 && b != 3) {
+        a -= 1;
+      }
+    `);
+
+    expect(codigoGo).toContain("\tfor a >= 0 && b != 3 {\n\t\ta -= 1\n\t}");
+  });
+
+  test("cobre todas as combinações parciais de cláusulas do for", () => {
+    const codigoGo = gerarDoCodigo(`
+      let i = 0;
+      for (; i < 3;) {
+        break;
+      }
+      for (let x = 0; x < 3;) {
+        x += 1;
+      }
+      for (let y = 0; ;) {
+        break;
+      }
+      for (; ; i += 1) {
+        break;
+      }
+    `);
+
+    expect(codigoGo).toContain("\tfor i < 3 {\n\t\tbreak\n\t}");
+    expect(codigoGo).toContain("\tfor x := 0; x < 3; {\n\t\tx += 1\n\t}");
+    expect(codigoGo).toContain("\tfor y := 0; ; {\n\t\tbreak\n\t}");
+    expect(codigoGo).toContain("\tfor ; ; i += 1 {\n\t\tbreak\n\t}");
+  });
+
+  test("suporta atualização e decremento com -= no cabeçalho e corpo do for", () => {
+    const codigoGo = gerarDoCodigo(`
+      let total = 20;
+      for (let i = 10; i > 0; i -= 2) {
+        total -= i;
+      }
+    `);
+
+    expect(codigoGo).toContain("\tfor i := 10; i > 0; i -= 2 {\n\t\ttotal -= i\n\t}");
   });
 });
