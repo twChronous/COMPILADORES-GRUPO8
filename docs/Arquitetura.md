@@ -1,10 +1,10 @@
 # Arquitetura
 
-Este documento apresenta a arquitetura básica do compilador desenvolvido pelo Grupo 8. O projeto tem o objetivo de traduzir um subconjunto da linguagem JavaScript (padrão ECMAScript) para código equivalente na linguagem Go.
+Este documento apresenta a arquitetura do compilador desenvolvido pelo Grupo 8. O projeto traduz um subconjunto da linguagem JavaScript (referenciado no padrão ECMAScript) para código equivalente na linguagem Go.
 
 ## Visão geral
 
-O compilador opera em etapas sequenciais e utiliza uma Interface de Linha de Comando (CLI) para gerenciar a execução. Cada etapa recebe a saída da etapa anterior, aplica uma transformação ou validação e encaminha o resultado para a próxima fase:
+O compilador opera em etapas sequenciais e é acionado por uma Interface de Linha de Comando (CLI). Cada fase recebe os dados da etapa anterior e atualiza o contexto compartilhado da compilação:
 
 ```text
 Código-fonte JavaScript
@@ -16,13 +16,13 @@ Analisador léxico (tokens)
 Analisador sintático (AST)
       |
       v
-Analisador semântico (Tabela de Símbolos e AST validada)
+Analisador semântico (Tabela de Símbolos e AST tipada)
       |
       v
-Gerador de código Go (AST → `codigoGerado`)
+Gerador de código Go (AST + inferência Go -> `codigoGerado`)
       |
       v
-Código-fonte Go (`package main` + funções auxiliares)
+Código-fonte Go (`package main`, imports, funções de topo e `func main()`)
 
 ```
 
