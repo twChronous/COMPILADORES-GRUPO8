@@ -61,6 +61,7 @@ O projeto é desenvolvido continuamente ao longo do semestre para a disciplina d
 - [Decisões de Arquitetura](Arquitetura.md)
 - [Estrutura de Testes](Testes.md)
 - [Documentação de Código](compiler/)
+- [Regras de Tradução JS → Go](Traducao.md)
 
 ---
 
