@@ -1,13 +1,13 @@
 # Especificação da Linguagem e Escopo
 
 > **Projeto:** Compilador JavaScript → Go — Grupo 8
-> **Referência desta revisão:** código da `main` e funcionalidades contempladas nas PRs #58 (precedência de operadores) e #59 (ampliação de testes).
-> **Observação de integração:** esta edição considera o conteúdo dessas PRs no **estado funcional consolidado**, conforme planejamento do grupo; o merge efetivo deve ser verificado no GitHub.
+> **Referência desta revisão:** branch `main` (análise léxica/sintática/semântica concluídas nas milestones 7 e 8; geração Go em andamento).
+> **Issue:** [#50 — Atualizar Escopo.md](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/50)
 > **Limite do projeto:** o subconjunto descrito abaixo não representa compatibilidade completa com ECMAScript.
 
 ## 1. Objetivo e referências
 
-O projeto da disciplina de Compiladores tem como objetivo analisar e, posteriormente, traduzir para Go programas escritos em um subconjunto de JavaScript. A implementação atual realiza as fases léxica, sintática e semântica, mas **ainda não gera arquivos Go a partir do código JavaScript**.
+O projeto da disciplina de Compiladores analisa e traduz para Go programas escritos em um subconjunto de JavaScript. A implementação atual cobre as fases léxica, sintática e semântica para o subconjunto listado neste documento e **já emite código Go** (`src/generators/go.generator.ts`) a partir da AST validada, com limitações descritas abaixo e em [Tradução JavaScript → Go](Traducao.md).
 
 Especificações de referência:
 
@@ -18,14 +18,14 @@ Especificações de referência:
 
 | Etapa | Situação | Resultado atual |
 | --- | --- | --- |
-| Análise léxica | Implementada para o subconjunto | Tokens com tipo, valor, linha e coluna |
-| Análise sintática | Implementada para as construções listadas, com limitações | AST tipada e recuperação de erros (*Panic Mode*) |
-| Análise semântica | Implementada para as regras listadas, com limitações | Validação, anotações `tipoInferido` e tabela de símbolos |
-| Representação intermediária (IR) | Planejada | Ainda não implementada |
-| Otimização | Planejada | Ainda não implementada |
-| Geração de código Go | Planejada | Ainda não implementada |
+| Análise léxica | **Implementado** | Tokens com tipo, valor, linha e coluna |
+| Análise sintática | **Implementado** (com limitações) | AST tipada e recuperação de erros (*Panic Mode*) |
+| Análise semântica | **Implementado** (com limitações) | Validação, anotações `tipoInferido` e tabela de símbolos |
+| Representação intermediária (IR) | **Fora do escopo** | Issues [#64](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/64)–[#66](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/66) canceladas; existe apenas *stub* em `ir.generator.ts`, não usado no pipeline de entrega |
+| Otimização | **Fora do escopo** | Não prevista nesta disciplina |
+| Geração de código Go | **Em progresso** | Tradução direta AST → Go via `GoGenerator`; integrada ao `Compiler.compile()`; refinamentos nas issues [#67](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/67)–[#73](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/73) |
 
-**Importante:** a geração de um executável ou pacote da ferramenta de compilação pelo processo de build não equivale à tradução do programa-fonte para código Go.
+**Importante:** compilar o *tooling* do projeto (`bun run build`, imagem Docker, etc.) não equivale a traduzir um programa-fonte `.js` para Go — a tradução ocorre ao executar o pipeline sobre o arquivo de entrada.
 
 ## 3. Tipos de dados e literais
 
@@ -80,10 +80,10 @@ Operadores reconhecidos e tratados pelo subconjunto:
 | Atribuição | `=`, `+=`, `-=` | Implementado |
 | Relacionais | `>`, `<`, `>=`, `<=` | Implementado |
 | Igualdade | `==`, `!=` | Implementado |
-| Lógicos | `&&` e `\|\|` | Implementado no estado consolidado, incluindo a precedência da PR #58 |
+| Lógicos | `&&` e `\|\|` | **Implementado**, com precedência conforme a gramática do parser |
 | Agrupamento | `(` e `)` | Implementado |
 
-No estado consolidado que contempla a PR #58, a prioridade, da maior para a menor, é:
+No código atual do analisador sintático, a prioridade, da maior para a menor, é:
 
 1. Acesso a membros, chamadas e agrupamento por parênteses.
 2. Multiplicação, divisão e módulo (`*`, `/`, `%`).
@@ -132,7 +132,14 @@ A análise semântica utiliza uma pilha de escopos e uma tabela de símbolos. As
 - O primeiro erro semântico normalmente interrompe a análise; o comportamento difere da recuperação de erros sintáticos.
 - Algumas regras são simplificações em relação ao JavaScript, particularmente escopo de `var`, conversões implícitas e operadores de igualdade.
 
-Regras e exemplos detalhados: [Analisador Semântico](Semantico.md).
+**Limitações da geração Go (fase atual):**
+
+- Tradução direta da AST, sem IR; tipos Go inferidos em `go.inference.ts` a partir de anotações semânticas simplificadas.
+- Funções só no nível superior do programa; declarações `function` dentro de blocos geram erro na emissão.
+- Builtins mapeados de forma fixa (ex.: `console.log` → `fmt.Println`); não cobre o ecossistema JavaScript completo.
+- Nem todo programa válido para o analisador produz Go compilável sem ajustes manuais — casos cobertos pelos testes em `go.generator.spec.ts` e `Compiler.integration.spec.ts`.
+
+Regras e exemplos detalhados: [Analisador Semântico](Semantico.md) e [Tradução JavaScript → Go](Traducao.md).
 
 ## 9. Testes
 
@@ -141,8 +148,10 @@ A suíte usa `bun:test`, com arquivos de testes próximos aos analisadores:
 - `src/analyzers/Lexycal.analyzer.spec.ts`
 - `src/analyzers/Syntactic.analyzer.spec.ts`
 - `src/analyzers/Semantical.analyzer.spec.ts`
+- `src/generators/go.generator.spec.ts`
+- `src/Compiler.integration.spec.ts` (pipeline léxico → Go)
 
-Os testes cobrem tokenização, construção de AST, precedência, agrupamentos, funções, condições, escopos, validação de tipos e comportamentos válidos e inválidos. A ampliação da PR #59 é considerada nesta descrição; alguns cenários ainda estão marcados como `test.skip` e **não são executados** até sua ativação. Portanto, a existência desses casos não equivale a uma verificação automatizada ativa.
+Os testes cobrem tokenização, AST, precedência, escopos, semântica, emissão Go e integração. Alguns cenários permanecem como `test.skip` nos analisadores e no gerador (ex.: execução comparativa com `go run` quando o Go não está no ambiente) e **não contam** como verificação ativa até serem habilitados.
 
 Para executar:
 
@@ -154,34 +163,62 @@ bunx tsc --noEmit
 
 Consulte [Estrutura de Testes](Testes.md) para o detalhamento dos casos.
 
-## 10. Roadmap e rastreabilidade das milestones 7 e 8
+## 10. Roadmap e rastreabilidade (milestones 7 e 8 e fase Go)
 
-Esta tabela apresenta **o estado funcional consolidado**, considerando o código integrado e o conteúdo das PRs #58 e #59. O estado administrativo de cada issue/PR deve ser consultado no GitHub.
+As tabelas abaixo descrevem o **comportamento esperado no código da `main`**. O estado de cada issue no GitHub (aberta/fechada) pode divergir enquanto o grupo conclui PRs — consulte o repositório para o status oficial.
 
-| Issue | Milestone | Escopo | Estado funcional considerado |
-| --- | --- | --- | --- |
-| [#38](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/38) | 7 | Parser de `while` | Implementado |
-| [#39](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/39) | 7 | Parser de `for` | Implementado (PR #57) |
-| [#40](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/40) | 7 | Parser de função e `return` | Implementado (PR #55) |
-| [#41](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/41) | 7 | Acesso a membro e chamadas | Implementado para o subconjunto |
-| [#42](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/42) | 7 | Precedência de operadores | Implementado no estado consolidado da PR #58 |
-| [#43](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/43) | 8 | Semântica de `while` | Implementado (PR #57) |
-| [#44](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/44) | 8 | Semântica de `for` | Implementado (PR #57) |
-| [#45](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/45) | 8 | Semântica de funções/`return` | Implementado com as limitações descritas (PR #56) |
-| [#46](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/46) | 8 | Semântica de chamadas e `console.log` | Parcial: identificação básica e validação de argumentos, sem assinatura completa |
-| [#47](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/47) | 8 | Ampliar testes sintáticos e semânticos | Cobertura ampliada no estado consolidado da PR #59; ainda há `test.skip` |
+### Milestone 7 — parsing
 
-Outras documentações relacionadas: [Arquitetura](Arquitetura.md), [Analisador Semântico](Semantico.md) e [Estrutura de Testes](Testes.md).
+| Issue | Escopo | Status no compilador |
+| --- | --- | --- |
+| [#38](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/38) | Parser de `while` | **Implementado** |
+| [#39](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/39) | Parser de `for` | **Implementado** |
+| [#40](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/40) | Parser de `function` e `return` | **Implementado** |
+| [#41](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/41) | Acesso a membro e chamadas | **Implementado** (subconjunto; ex.: `console.log`) |
+| [#42](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/42) | Precedência e parênteses | **Implementado** |
+
+### Milestone 8 — semântica e testes
+
+| Issue | Escopo | Status no compilador |
+| --- | --- | --- |
+| [#43](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/43) | Semântica de `while` | **Implementado** |
+| [#44](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/44) | Semântica de `for` | **Implementado** |
+| [#45](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/45) | Semântica de funções e `return` | **Implementado** (com limitações da seção 8) |
+| [#46](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/46) | Chamadas e `console.log` | **Implementado** (validação básica; sem assinaturas completas de builtins) |
+| [#47](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/47) | Ampliar testes sintático/semântico | **Implementado** (permanecem casos `test.skip`) |
+
+### Fase atual — geração Go e entrega
+
+| Issue | Escopo | Status no compilador |
+| --- | --- | --- |
+| [#67](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/67) | Expressões, literais e `let`/`const`/`var` em Go | **Em progresso** (base em `go.generator.ts`; revisão e casos de borda) |
+| [#68](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/68) | Controle de fluxo em Go | **Implementado** (`if`/`else`, `while`, `for`, `break`/`continue`) |
+| [#69](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/69) | Funções, `return` e `console.log` → `fmt` | **Implementado** (funções aninhadas não suportadas) |
+| [#70](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/70) | Integrar gerador no `Compiler` e loaders | **Em progresso** (`compile()` já invoca o gerador Go; alinhamento de loaders e erros) |
+| [#71](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/71) | CLI e exemplos ponta a ponta | **Em progresso** (`--go`, `-o`/`--out` existem; falta padronizar `--output` e pasta `examples/`) |
+| [#73](https://github.com/twChronous/COMPILADORES-GRUPO8/issues/73) | Testes de integração do pipeline | **Em progresso** (`Compiler.integration.spec.ts` parcial; expansão prevista) |
+
+Documentação relacionada: [Arquitetura](Arquitetura.md), [Analisador Semântico](Semantico.md), [Tradução JavaScript → Go](Traducao.md) e [Estrutura de Testes](Testes.md).
 
 ## 11. Entrada, execução e saída
 
-A aplicação recebe um arquivo JavaScript por linha de comando ou, na ausência de arquivo, executa uma entrada de exemplo interna. Há opções para exibir tokens, AST e tabela de símbolos.
+A aplicação (`src/index.ts`) recebe um arquivo `.js` na linha de comando ou, sem arquivo, usa um exemplo interno. Flags opcionais expõem artefatos intermediários; após análise bem-sucedida, o código Go é gerado e pode ser impresso ou gravado em disco.
 
 ```bash
 bun start --help
-bun start --ast
-bun start --tokens
-bun start --ts
+bun start arquivo.js
+bun start arquivo.js --go
+bun start arquivo.js -o saida.go    # equivalente a --out
+bun start arquivo.js --ast
+bun start arquivo.js --tokens
+bun start arquivo.js --ts
+bun start arquivo.js --verbose
 ```
 
-O processamento atual produz tokens, AST, anotações semânticas, tabela de símbolos e diagnósticos. **A tradução para Go permanece uma etapa futura.**
+Comportamento resumido:
+
+- Sem flags de depuração (`--ast`, `--tokens`, `--ts`), a saída padrão após compilação bem-sucedida é o **código Go** gerado.
+- `-o` / `--out <arquivo>` grava o `.go` e ainda imprime o código, salvo se só outras flags de inspeção forem usadas.
+- Falha em qualquer fase (léxica, sintática, semântica ou geração) encerra com código de saída `1`.
+
+Detalhes da emissão Go: [Traducao.md](Traducao.md).
